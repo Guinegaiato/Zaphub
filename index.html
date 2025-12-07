@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ZapHub Pro - Automação & Relatórios</title>
+    <title>ZapHub Pro - Automação & CRM</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -52,11 +52,11 @@
 <script type="importmap">
 {
   "imports": {
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
     "react": "https://aistudiocdn.com/react@^19.2.1",
-    "xlsx": "https://aistudiocdn.com/xlsx@^0.18.5"
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "xlsx": "https://aistudiocdn.com/xlsx@^0.18.5",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0"
   }
 }
 </script>
@@ -135,13 +135,18 @@
 
       // --- ICONS (LUCIDE WRAPPER) ---
       const Icon = ({ name, size = 18, className = "" }) => {
-        // Fallback or Lucide
+        // Fallback safety if Lucide fails to load
+        if (!window.lucide || !window.lucide.icons) {
+            return <span className={`inline-block bg-gray-400 rounded-sm ${className}`} style={{ width: size, height: size }}></span>;
+        }
         return <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>;
       };
 
       const useLucide = () => {
         useEffect(() => {
-          if (window.lucide) window.lucide.createIcons();
+          if (window.lucide) {
+              window.lucide.createIcons();
+          }
         });
       };
 
@@ -150,16 +155,14 @@
         if (!phone) return '';
         let str = String(phone).replace(/\D/g, ''); 
         if (str.length < 8) return ''; 
-        if (str.length <= 9) return str; // Likely missing DDD or local
-        // If 10 or 11 digits, assume BR format. 
+        if (str.length <= 9) return str; 
         if (str.length === 10 || str.length === 11) str = '55' + str;
         return str;
       };
 
       const getCityFromPhone = (phone) => {
-        // Expected format: 55 + DDD + NUM (12 or 13 digits)
         if (!phone || phone.length < 12) return 'Desconhecido';
-        const ddd = phone.substring(2, 4); // Chars at index 2 and 3
+        const ddd = phone.substring(2, 4);
         return DDD_MAP[parseInt(ddd)] || `Região DDD ${ddd}`;
       };
 
@@ -182,8 +185,9 @@
         const [leads, setLeads] = useState([]);
         const [message, setMessage] = useState("Olá! Vi seu contato e gostaria de falar sobre nossos serviços.");
         
-        // History State
+        // History State (Enhanced with CRM fields)
         const [history, setHistory] = useState([]);
+        const [selectedLead, setSelectedLead] = useState(null); // For Modal
 
         // LOAD HISTORY ON MOUNT
         useEffect(() => {
@@ -208,9 +212,7 @@
             const ws = wb.Sheets[wb.SheetNames[0]];
             const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
             
-            // CLEAN EMPTY TOP ROWS
             let startIndex = 0;
-            // Scan first 20 rows to find a likely header row
             for(let i=0; i<Math.min(data.length, 20); i++) {
                 const rowStr = JSON.stringify(data[i]).toLowerCase();
                 if(rowStr.includes('nome') || rowStr.includes('cliente') || rowStr.includes('aluno') || rowStr.includes('tel') || rowStr.includes('cel')) {
@@ -220,10 +222,8 @@
             }
             
             const cleanData = data.slice(startIndex);
-            
             if (cleanData.length > 0) {
               setFileData(cleanData);
-              // Set headers from the first row found
               setHeaders(cleanData[0].map((h, i) => ({ idx: i, val: h || `Coluna ${i+1}` })));
               setMapStep(true);
               setColName(-1);
@@ -245,11 +245,9 @@
           for (let i = 1; i < fileData.length; i++) {
              const row = fileData[i];
              if (!row) continue;
-             
              const rawName = row[colName];
              const rawPhone = row[colPhone];
-             
-             if (!rawName && !rawPhone) continue; // Skip empty rows
+             if (!rawName && !rawPhone) continue;
 
              const cleanPhone = sanitizePhone(rawPhone);
              const isValid = cleanPhone.length >= 12;
@@ -269,7 +267,7 @@
           setActiveView('list');
         };
 
-        // --- HISTORY LOGIC ---
+        // --- HISTORY & CRM LOGIC ---
         const checkHistory = (phone) => history.some(h => h.phone === phone);
 
         const addToHistory = (lead) => {
@@ -278,16 +276,46 @@
           const newEntry = {
             phone: lead.phone,
             name: lead.name,
-            timestamp: today.getTime(), // Store timestamp for accurate sorting/filtering
+            timestamp: today.getTime(),
             dateStr: today.toLocaleDateString('pt-BR'),
             timeStr: today.toLocaleTimeString('pt-BR'),
-            niche: activeNiche?.label || 'Geral'
+            hour: today.getHours(), // For heatmap
+            niche: activeNiche?.label || 'Geral',
+            crmStatus: 'sent', // sent, replied, converted
+            tags: []
           };
           
           const newHistory = [newEntry, ...history];
-          setHistory(newHistory);
-          localStorage.setItem('ZAPHUB_HISTORY_V2', JSON.stringify(newHistory));
+          updateHistory(newHistory);
           setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, sent: true } : l));
+        };
+
+        const updateHistory = (newData) => {
+           setHistory(newData);
+           localStorage.setItem('ZAPHUB_HISTORY_V2', JSON.stringify(newData));
+        };
+
+        const updateLeadStatus = (phone, newStatus) => {
+           const newData = history.map(h => h.phone === phone ? { ...h, crmStatus: newStatus } : h);
+           updateHistory(newData);
+           if(selectedLead && selectedLead.phone === phone) {
+               setSelectedLead({ ...selectedLead, crmStatus: newStatus });
+           }
+        };
+
+        const addTag = (phone, tag) => {
+           const newData = history.map(h => {
+               if(h.phone === phone) {
+                   const tags = h.tags || [];
+                   if(!tags.includes(tag)) return { ...h, tags: [...tags, tag] };
+               }
+               return h;
+           });
+           updateHistory(newData);
+           if(selectedLead && selectedLead.phone === phone) {
+               const tags = selectedLead.tags || [];
+               if(!tags.includes(tag)) setSelectedLead({ ...selectedLead, tags: [...tags, tag] });
+           }
         };
 
         const handleSend = (lead) => {
@@ -317,11 +345,11 @@
               </button>
               
               <button onClick={() => { setActiveView('reports'); setActiveNiche(null); }} className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors ${activeView === 'reports' ? 'bg-gold text-primary font-bold' : 'hover:bg-gray-800'}`}>
-                <Icon name="bar-chart-2" className="mr-3"/> Relatórios & Mapa
+                <Icon name="bar-chart-2" className="mr-3"/> Dashboard CRM
               </button>
 
               <button onClick={() => { setActiveView('history'); setActiveNiche(null); }} className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors ${activeView === 'history' ? 'bg-gold text-primary font-bold' : 'hover:bg-gray-800'}`}>
-                <Icon name="history" className="mr-3"/> Histórico
+                <Icon name="history" className="mr-3"/> Histórico Rico
               </button>
 
               <div className="mt-6 mb-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nichos</div>
@@ -339,84 +367,226 @@
         );
 
         const RenderReports = () => {
-           // Calc Stats
+           // Stats Calculation
            const total = history.length;
            const todayDate = new Date().toLocaleDateString('pt-BR');
            const todayCount = history.filter(h => h.dateStr === todayDate).length;
            
-           // Geo Stats
-           const geoMap = {};
-           history.forEach(h => {
-              const city = getCityFromPhone(h.phone);
-              geoMap[city] = (geoMap[city] || 0) + 1;
-           });
+           // CRM Funnel
+           const replied = history.filter(h => h.crmStatus === 'replied' || h.crmStatus === 'converted').length;
+           const converted = history.filter(h => h.crmStatus === 'converted').length;
            
-           const sortedGeo = Object.entries(geoMap).sort((a,b) => b[1] - a[1]);
+           // Health/Safety Score Logic (Volume based)
+           // 0-50: Safe (High), 51-200: Moderate, 200+: Risky
+           let safetyScore = 100;
+           let safetyLabel = "Alta (Seguro)";
+           let safetyColor = "text-green-500";
+           if (todayCount > 50) { safetyScore = 70; safetyLabel = "Média"; safetyColor = "text-yellow-500"; }
+           if (todayCount > 200) { safetyScore = 30; safetyLabel = "Risco de Ban"; safetyColor = "text-red-500"; }
+           
+           // Heatmap Logic (By Hour)
+           const hours = Array(24).fill(0);
+           history.forEach(h => {
+             if (h.hour !== undefined) hours[h.hour]++;
+           });
+           const maxHour = Math.max(...hours) || 1; // avoid div by zero
 
            return (
-             <div className="p-8 animate-fade-in w-full max-w-6xl mx-auto">
+             <div className="p-8 animate-fade-in w-full max-w-7xl mx-auto pb-20">
                 <h2 className="text-3xl font-serif font-bold text-primary mb-6 flex items-center">
-                  <Icon name="pie-chart" className="mr-3 text-gold" size={32}/> Relatórios de Performance
+                  <Icon name="bar-chart-2" className="mr-3 text-gold" size={32}/> Dashboard & Performance
                 </h2>
                 
-                {/* Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                   <div className="bg-white p-6 rounded-xl shadow border-l-4 border-blue-500">
-                      <div className="text-gray-500 text-sm font-bold uppercase mb-1">Total Enviado</div>
-                      <div className="text-4xl font-bold text-primary">{total}</div>
-                      <div className="text-xs text-gray-400 mt-2">Mensagens vitalícias</div>
+                {/* --- TOP METRICS --- */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+                   {/* NEW: Enviados Hoje - DESTACADO */}
+                   <div className="bg-white p-5 rounded-xl shadow border-l-4 border-blue-600">
+                      <div className="text-gray-400 text-xs font-bold uppercase">Enviados Hoje</div>
+                      <div className="text-4xl font-bold text-blue-600 mt-2">{todayCount}</div>
+                      <div className="text-xs text-gray-400 mt-1">{todayDate}</div>
                    </div>
-                   <div className="bg-white p-6 rounded-xl shadow border-l-4 border-green-500">
-                      <div className="text-gray-500 text-sm font-bold uppercase mb-1">Enviados Hoje</div>
-                      <div className="text-4xl font-bold text-green-600">{todayCount}</div>
-                      <div className="text-xs text-gray-400 mt-2">{todayDate}</div>
+
+                   <div className="bg-white p-5 rounded-xl shadow border-l-4 border-gray-400">
+                      <div className="text-gray-400 text-xs font-bold uppercase">Total Enviado</div>
+                      <div className="text-3xl font-bold text-primary mt-1">{total}</div>
+                      <div className="text-xs text-gray-400 mt-1">Desde o início</div>
                    </div>
-                   <div className="bg-white p-6 rounded-xl shadow border-l-4 border-gold">
-                      <div className="text-gray-500 text-sm font-bold uppercase mb-1">Top Região</div>
-                      <div className="text-2xl font-bold text-gold-dark truncate">
-                        {sortedGeo.length > 0 ? sortedGeo[0][0] : '-'}
+
+                   <div className="bg-white p-5 rounded-xl shadow border-l-4 border-purple-500">
+                      <div className="text-gray-400 text-xs font-bold uppercase">Taxa de Resposta</div>
+                      <div className="text-3xl font-bold text-purple-600 mt-1">
+                         {total > 0 ? ((replied / total) * 100).toFixed(1) : 0}%
                       </div>
-                      <div className="text-xs text-gray-400 mt-2">Maior volume de leads</div>
+                      <div className="text-xs text-gray-400 mt-1">{replied} respostas</div>
+                   </div>
+
+                   <div className="bg-white p-5 rounded-xl shadow border-l-4 border-green-500">
+                      <div className="text-gray-400 text-xs font-bold uppercase">Vendas</div>
+                      <div className="text-3xl font-bold text-green-600 mt-1">
+                         {total > 0 ? ((converted / total) * 100).toFixed(1) : 0}%
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">{converted} conversões</div>
+                   </div>
+
+                   <div className="bg-white p-5 rounded-xl shadow border-l-4 border-red-400">
+                      <div className="text-gray-400 text-xs font-bold uppercase">Saúde da Conta</div>
+                      <div className={`text-3xl font-bold mt-1 ${safetyColor}`}>{safetyScore}%</div>
+                      <div className="text-xs text-gray-400 mt-1">{safetyLabel}</div>
                    </div>
                 </div>
 
-                {/* Geo Table */}
-                <div className="bg-white rounded-xl shadow overflow-hidden">
-                   <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-                     <h3 className="font-bold text-lg text-gray-800">Mapa de Calor (Por DDD)</h3>
-                     <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">Baseado no histórico</span>
-                   </div>
-                   <div className="p-0 overflow-x-auto">
-                     <table className="w-full text-left">
-                       <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                         <tr>
-                           <th className="p-4">Região / Cidade</th>
-                           <th className="p-4 w-32 text-right">Envios</th>
-                           <th className="p-4 w-64">% do Total</th>
-                         </tr>
-                       </thead>
-                       <tbody className="divide-y divide-gray-100">
-                         {sortedGeo.map(([city, count], i) => (
-                           <tr key={i} className="hover:bg-blue-50 transition-colors">
-                             <td className="p-4 font-medium text-gray-700">{city}</td>
-                             <td className="p-4 text-right font-bold text-primary">{count}</td>
-                             <td className="p-4">
-                               <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                 <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${(count/total)*100}%` }}></div>
-                               </div>
-                             </td>
-                           </tr>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                   {/* --- HEATMAP --- */}
+                   <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow">
+                      <h3 className="font-bold text-gray-800 mb-4 flex items-center">
+                         <Icon name="clock" className="mr-2 text-gray-400" size={18}/> Melhores Horários (Heatmap)
+                      </h3>
+                      <div className="flex items-end space-x-1 h-48">
+                         {hours.map((count, i) => (
+                           <div key={i} className="flex-1 flex flex-col justify-end group relative">
+                              <div 
+                                className={`w-full rounded-t transition-all duration-300 ${count === 0 ? 'bg-gray-100' : 'bg-blue-500 hover:bg-blue-600'}`} 
+                                style={{ height: `${(count/maxHour)*100}%` }}
+                              ></div>
+                              <span className="text-[10px] text-gray-400 text-center mt-1">{i}h</span>
+                              
+                              {/* Tooltip */}
+                              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                                {count} envios
+                              </div>
+                           </div>
                          ))}
-                         {sortedGeo.length === 0 && (
-                           <tr><td colSpan="3" className="p-8 text-center text-gray-400">Sem dados suficientes ainda.</td></tr>
-                         )}
-                       </tbody>
-                     </table>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-4 text-center">Volume de envios por hora do dia. Use para saber quando você é mais produtivo.</p>
+                   </div>
+
+                   {/* --- CRM TIPS --- */}
+                   <div className="bg-gradient-to-br from-primary to-slate-800 p-6 rounded-xl shadow text-white">
+                      <h3 className="font-bold text-gold mb-4 flex items-center">
+                        <Icon name="shield" className="mr-2" size={18}/> Dicas de Segurança
+                      </h3>
+                      <ul className="space-y-3 text-sm text-gray-300">
+                        <li className="flex items-start"><span className="text-gold mr-2">•</span> Aqueça o chip: comece enviando 10-20 msgs/dia.</li>
+                        <li className="flex items-start"><span className="text-gold mr-2">•</span> Varie as mensagens para evitar detecção de spam.</li>
+                        <li className="flex items-start"><span className="text-gold mr-2">•</span> Nunca envie mais de 500 mensagens/dia em um chip pessoal.</li>
+                        <li className="flex items-start"><span className="text-gold mr-2">•</span> Se a "Saúde da Conta" cair, pare por 24h.</li>
+                      </ul>
                    </div>
                 </div>
              </div>
            );
         };
+
+        const LeadDetailModal = ({ lead, onClose }) => {
+           if (!lead) return null;
+           const city = getCityFromPhone(lead.phone);
+           
+           return (
+             <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+                   <div className="bg-primary p-6 flex justify-between items-start">
+                      <div>
+                         <h3 className="text-xl font-bold text-white mb-1">{lead.name}</h3>
+                         <p className="text-gold-light font-mono">{lead.phone}</p>
+                      </div>
+                      <button onClick={onClose} className="text-white/50 hover:text-white"><Icon name="x"/></button>
+                   </div>
+                   
+                   <div className="p-6">
+                      <div className="grid grid-cols-2 gap-4 mb-6">
+                         <div className="p-3 bg-gray-50 rounded border">
+                            <label className="text-xs text-gray-400 uppercase">Região</label>
+                            <div className="font-medium text-gray-700">{city}</div>
+                         </div>
+                         <div className="p-3 bg-gray-50 rounded border">
+                            <label className="text-xs text-gray-400 uppercase">Primeiro Contato</label>
+                            <div className="font-medium text-gray-700">{lead.dateStr}</div>
+                         </div>
+                      </div>
+
+                      <div className="mb-6">
+                         <label className="text-sm font-bold text-gray-700 mb-2 block">Status do Funil</label>
+                         <div className="flex bg-gray-100 p-1 rounded-lg">
+                            <button onClick={() => updateLeadStatus(lead.phone, 'sent')} className={`flex-1 py-2 text-xs font-bold rounded ${lead.crmStatus === 'sent' ? 'bg-white shadow text-gray-800' : 'text-gray-400'}`}>Enviado</button>
+                            <button onClick={() => updateLeadStatus(lead.phone, 'replied')} className={`flex-1 py-2 text-xs font-bold rounded ${lead.crmStatus === 'replied' ? 'bg-blue-100 text-blue-700' : 'text-gray-400 hover:text-blue-500'}`}>Respondeu</button>
+                            <button onClick={() => updateLeadStatus(lead.phone, 'converted')} className={`flex-1 py-2 text-xs font-bold rounded ${lead.crmStatus === 'converted' ? 'bg-green-100 text-green-700' : 'text-gray-400 hover:text-green-500'}`}>Vendeu ($)</button>
+                         </div>
+                      </div>
+
+                      <div className="mb-6">
+                         <label className="text-sm font-bold text-gray-700 mb-2 block">Tags</label>
+                         <div className="flex flex-wrap gap-2 mb-2">
+                            {(lead.tags || []).map(t => (
+                               <span key={t} className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded-full">{t}</span>
+                            ))}
+                         </div>
+                         <div className="flex gap-2">
+                            {['Quente', 'Frio', 'Retorno', 'Sem Interesse'].map(tag => (
+                               <button key={tag} onClick={() => addTag(lead.phone, tag)} className="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50">+ {tag}</button>
+                            ))}
+                         </div>
+                      </div>
+                      
+                      <div className="flex gap-3">
+                         <a href={`https://wa.me/${lead.phone}`} target="_blank" className="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-bold text-center flex justify-center items-center">
+                            <Icon name="message-circle" className="mr-2" size={16}/> Abrir WhatsApp
+                         </a>
+                      </div>
+                   </div>
+                </div>
+             </div>
+           );
+        };
+
+        const RenderHistory = () => (
+          <div className="p-8 max-w-6xl mx-auto animate-fade-in pb-20">
+             <div className="flex justify-between items-center mb-6">
+               <h2 className="text-3xl font-serif font-bold text-primary">Histórico Rico (CRM)</h2>
+               <button onClick={() => { if(confirm('Apagar tudo?')) { localStorage.removeItem('ZAPHUB_HISTORY_V2'); setHistory([]); } }} className="text-red-500 text-sm hover:underline">Limpar Tudo</button>
+             </div>
+             
+             <div className="bg-white rounded-xl shadow overflow-hidden">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                    <tr>
+                      <th className="p-4">Nome</th>
+                      <th className="p-4">Telefone</th>
+                      <th className="p-4">Status (CRM)</th>
+                      <th className="p-4">Tags</th>
+                      <th className="p-4 text-right">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {history.map((h, i) => (
+                      <tr key={i} className="hover:bg-gray-50 cursor-pointer group" onClick={() => setSelectedLead(h)}>
+                        <td className="p-4 font-medium text-gray-900">{h.name}</td>
+                        <td className="p-4 font-mono text-gray-600">{h.phone}</td>
+                        <td className="p-4">
+                           {h.crmStatus === 'converted' && <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Venda</span>}
+                           {h.crmStatus === 'replied' && <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">Respondeu</span>}
+                           {(!h.crmStatus || h.crmStatus === 'sent') && <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Enviado</span>}
+                        </td>
+                        <td className="p-4">
+                           <div className="flex gap-1">
+                             {(h.tags || []).slice(0, 2).map(t => <span key={t} className="w-2 h-2 rounded-full bg-gold" title={t}></span>)}
+                             {(h.tags || []).length > 0 && <span className="text-xs text-gray-400 ml-1">{(h.tags || []).join(', ')}</span>}
+                           </div>
+                        </td>
+                        <td className="p-4 text-right">
+                           <button className="text-primary opacity-0 group-hover:opacity-100 font-bold text-xs border border-primary px-3 py-1 rounded hover:bg-primary hover:text-white transition-all">
+                             Ver Detalhes
+                           </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {history.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-gray-400">Nenhum histórico encontrado.</td></tr>}
+                  </tbody>
+                </table>
+             </div>
+             
+             {selectedLead && <LeadDetailModal lead={selectedLead} onClose={() => setSelectedLead(null)} />}
+          </div>
+        );
 
         const RenderHome = () => (
           <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50 h-full">
@@ -486,7 +656,7 @@
            const validLeads = leads.filter(l => l.status === 'valid');
            
            return (
-             <div className="p-6 md:p-8 max-w-7xl mx-auto h-full flex flex-col">
+             <div className="p-6 md:p-8 max-w-7xl mx-auto h-full flex flex-col pb-20">
                 <div className="flex justify-between items-end mb-6">
                    <div>
                      <h2 className="text-3xl font-serif font-bold text-primary">{activeNiche?.label || 'Lista Geral'}</h2>
@@ -543,39 +713,6 @@
              </div>
            );
         };
-        
-        const RenderHistory = () => (
-          <div className="p-8 max-w-6xl mx-auto animate-fade-in">
-             <div className="flex justify-between items-center mb-6">
-               <h2 className="text-3xl font-serif font-bold text-primary">Histórico de Envios</h2>
-               <button onClick={() => { if(confirm('Apagar tudo?')) { localStorage.removeItem('ZAPHUB_HISTORY_V2'); setHistory([]); } }} className="text-red-500 text-sm hover:underline">Limpar Tudo</button>
-             </div>
-             
-             <div className="bg-white rounded-xl shadow overflow-hidden">
-                <table className="w-full text-left">
-                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-                    <tr>
-                      <th className="p-4">Nome</th>
-                      <th className="p-4">Telefone</th>
-                      <th className="p-4">Região</th>
-                      <th className="p-4">Data</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {history.map((h, i) => (
-                      <tr key={i} className="hover:bg-gray-50">
-                        <td className="p-4 font-medium">{h.name}</td>
-                        <td className="p-4 font-mono text-gray-600">{h.phone}</td>
-                        <td className="p-4 text-sm text-blue-600 font-medium">{getCityFromPhone(h.phone)}</td>
-                        <td className="p-4 text-sm text-gray-400">{h.dateStr} às {h.timeStr}</td>
-                      </tr>
-                    ))}
-                    {history.length === 0 && <tr><td colSpan="4" className="p-8 text-center text-gray-400">Nenhum histórico encontrado.</td></tr>}
-                  </tbody>
-                </table>
-             </div>
-          </div>
-        );
 
         // --- MAIN RENDER ---
         return (
@@ -620,4 +757,3 @@
     </script>
 </body>
 </html>
-    
