@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ZapHub Pro - Automação WhatsApp</title>
+    <title>ZapHub Pro - Automação & Relatórios</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -20,7 +20,7 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     
     <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
 
     <script>
       tailwind.config = {
@@ -29,6 +29,15 @@
             colors: {
               primary: { DEFAULT: '#0B1120', light: '#1e293b' },
               gold: { DEFAULT: '#d4af37', light: '#f3e5ab', dark: '#aa8c2c' }
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              }
             }
           }
         }
@@ -36,19 +45,18 @@
     </script>
     <style>
       body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-      .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
       ::-webkit-scrollbar { width: 8px; height: 8px; }
-      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
       ::-webkit-scrollbar-track { background: transparent; }
     </style>
 <script type="importmap">
 {
   "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
     "react/": "https://aistudiocdn.com/react@^19.2.1/",
     "react": "https://aistudiocdn.com/react@^19.2.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "xlsx": "https://aistudiocdn.com/xlsx@^0.18.5",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0"
+    "xlsx": "https://aistudiocdn.com/xlsx@^0.18.5"
   }
 }
 </script>
@@ -57,108 +65,137 @@
     <div id="root"></div>
 
     <script type="text/babel">
-      const { useState, useEffect, useRef, useMemo } = React;
+      const { useState, useEffect, useMemo } = React;
 
-      // --- ICON CONFIGURATION ---
-      const Icon = ({ name, size = 20, className = "" }) => {
-        const lucide = window.lucide;
-        if (!lucide) return <span className="font-bold">?</span>;
-        
-        const IconComponent = lucide.icons[name];
-        if (!IconComponent) return null;
+      // --- CONFIG & CONSTANTS ---
+      
+      const DDD_MAP = {
+        11: 'SP - São Paulo (Capital)', 12: 'SP - Vale do Paraíba', 13: 'SP - Baixada Santista', 14: 'SP - Bauru/Marília', 15: 'SP - Sorocaba', 16: 'SP - Ribeirão Preto', 17: 'SP - Rio Preto', 18: 'SP - Pres. Prudente', 19: 'SP - Campinas',
+        21: 'RJ - Rio de Janeiro', 22: 'RJ - Campos', 24: 'RJ - Volta Redonda',
+        27: 'ES - Vitória', 28: 'ES - Cachoeiro',
+        31: 'MG - Belo Horizonte', 32: 'MG - Juiz de Fora', 33: 'MG - Gov. Valadares', 34: 'MG - Uberlândia', 35: 'MG - Poços de Caldas', 37: 'MG - Divinópolis', 38: 'MG - Montes Claros',
+        41: 'PR - Curitiba', 42: 'PR - Ponta Grossa', 43: 'PR - Londrina', 44: 'PR - Maringá', 45: 'PR - Foz do Iguaçu', 46: 'PR - Francisco Beltrão',
+        47: 'SC - Joinville', 48: 'SC - Florianópolis', 49: 'SC - Chapecó',
+        51: 'RS - Porto Alegre', 53: 'RS - Pelotas', 54: 'RS - Caxias do Sul', 55: 'RS - Santa Maria',
+        61: 'DF - Brasília', 62: 'GO - Goiânia', 64: 'GO - Rio Verde',
+        63: 'TO - Tocantins',
+        65: 'MT - Cuiabá', 66: 'MT - Rondonópolis',
+        67: 'MS - Campo Grande',
+        68: 'AC - Acre', 69: 'RO - Rondônia',
+        71: 'BA - Salvador', 73: 'BA - Ilhéus', 74: 'BA - Juazeiro', 75: 'BA - Feira de Santana', 77: 'BA - Barreiras',
+        79: 'SE - Sergipe',
+        81: 'PE - Recife', 87: 'PE - Petrolina',
+        82: 'AL - Alagoas',
+        83: 'PB - Paraíba',
+        84: 'RN - Rio Grande do Norte',
+        85: 'CE - Fortaleza', 88: 'CE - Juazeiro do Norte',
+        86: 'PI - Teresina', 89: 'PI - Picos',
+        91: 'PA - Belém', 93: 'PA - Santarém', 94: 'PA - Marabá',
+        92: 'AM - Manaus', 97: 'AM - Coari',
+        95: 'RR - Roraima',
+        96: 'AP - Amapá',
+        98: 'MA - São Luís', 99: 'MA - Imperatriz'
+      };
 
-        // Render SVG manually since we are in standalone mode without strict lucide-react bindings
-        const svgContent = lucide.createElement(IconComponent);
-        
-        // We need to convert the DOM node created by lucide.createElement to React or use dangerouslySetInnerHTML
-        // A simpler way for this standalone setup is to map names to a few hardcoded SVGs or assume lucide-react isn't available and use lucide generic.
-        // Actually, let's just use a simple mapping for reliability in this specific standalone file.
-        
+      const NICHES = [
+        { id: 'lawyer', label: 'Advocacia (Criminal/Família)', icon: 'scale' },
+        { id: 'accounting', label: 'Contadores para MEIs', icon: 'calculator' },
+        { id: 'dentist_aesthetic', label: 'Dentistas Estéticos', icon: 'sparkles' },
+        { id: 'ortho', label: 'Ortodontia', icon: 'smile' },
+        { id: 'psych', label: 'Psicólogos e Psiquiatras', icon: 'users' },
+        { id: 'coach', label: 'Coach Executivo', icon: 'crown' },
+        { id: 'franchise', label: 'Consultor de Franquias', icon: 'trending-up' },
+        { id: 'realestate', label: 'Imobiliária Alto Padrão', icon: 'home' },
+        { id: 'insurance', label: 'Corretor Seguros de Vida', icon: 'shield-check' },
+        { id: 'architect', label: 'Arquiteto de Interiores', icon: 'pen-tool' },
+        { id: 'design_com', label: 'Designer Comercial', icon: 'briefcase' },
+        { id: 'safety', label: 'Eng. Segurança Trabalho', icon: 'hard-hat' },
+        { id: 'pest', label: 'Empresas de Dedetização', icon: 'bug' },
+        { id: 'furniture', label: 'Móveis Planejados', icon: 'sofa' },
+        { id: 'curtains', label: 'Persianas Automatizadas', icon: 'blinds' },
+        { id: 'cctv', label: 'Empresas de CFTV', icon: 'video' },
+        { id: 'solar', label: 'Placas Solares', icon: 'sun' },
+        { id: 'music', label: 'Escola de Música', icon: 'music' },
+        { id: 'language', label: 'Escola de Idiomas', icon: 'languages' },
+        { id: 'tutoring', label: 'Reforço para Concursos', icon: 'book-open' },
+        { id: 'organizer', label: 'Personal Organizer', icon: 'layers' },
+        { id: 'physio', label: 'Fisioterapia Domiciliar', icon: 'activity' },
+        { id: 'acu', label: 'Acupuntura Estética', icon: 'sparkles' },
+        { id: 'tattoo', label: 'Estúdio de Tatuagem', icon: 'palette' },
+        { id: 'dispatcher', label: 'Despachante', icon: 'file-text' },
+        { id: 'dentist', label: 'Clínicas Odontológicas', icon: 'smile' },
+        { id: 'food', label: 'Lanchonetes', icon: 'utensils' },
+        { id: 'aesthetics', label: 'Clínicas de Estética', icon: 'sparkles' },
+        { id: 'derma', label: 'Dermatologia', icon: 'activity' },
+        { id: 'laser', label: 'Depilação a Laser', icon: 'zap' },
+        { id: 'facilities', label: 'Manutenção Predial', icon: 'hammer' },
+        { id: 'logistics', label: 'Transportadoras', icon: 'truck' },
+        { id: 'trainer', label: 'Personal Trainer', icon: 'dumbbell' },
+      ];
+
+      // --- ICONS (LUCIDE WRAPPER) ---
+      const Icon = ({ name, size = 18, className = "" }) => {
+        // Fallback or Lucide
         return <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>;
       };
 
-      // We trigger lucide.createIcons() after render
       const useLucide = () => {
         useEffect(() => {
           if (window.lucide) window.lucide.createIcons();
         });
       };
 
-      // --- NICHES DATABASE ---
-      const NICHES = [
-        { id: 'dentist', label: 'Clínicas Odontológicas', icon: 'smile' },
-        { id: 'aesthetic', label: 'Clínicas de Estética', icon: 'sparkles' },
-        { id: 'lawyer', label: 'Advogados', icon: 'scale' },
-        { id: 'food', label: 'Lanchonetes e Restaurantes', icon: 'utensils' },
-        { id: 'realty', label: 'Corretores de Imóveis', icon: 'home' },
-        { id: 'accountant', label: 'Contadores MEI', icon: 'calculator' },
-        { id: 'architect', label: 'Arquitetos de Interiores', icon: 'pen-tool' },
-        { id: 'designer', label: 'Designers Comerciais', icon: 'briefcase' },
-        { id: 'furniture', label: 'Móveis Planejados', icon: 'sofa' },
-        { id: 'curtains', label: 'Persianas Automatizadas', icon: 'blinds' }, // 'blinds' might not exist, fallback to 'menu'
-        { id: 'security', label: 'CFTV e Segurança', icon: 'camera' },
-        { id: 'solar', label: 'Placas Solares', icon: 'sun' },
-        { id: 'pest', label: 'Dedetização', icon: 'bug' },
-        { id: 'cleaning', label: 'Limpeza Pós-Obra', icon: 'spray-can' }, // fallback
-        { id: 'video', label: 'Produtoras de Vídeo', icon: 'video' },
-        { id: 'tattoo', label: 'Estúdios de Tatuagem', icon: 'palette' },
-        { id: 'franchise', label: 'Consultores de Franquias', icon: 'trending-up' },
-        { id: 'insurance', label: 'Corretores de Seguros', icon: 'shield' },
-        { id: 'music', label: 'Escolas de Música', icon: 'music' },
-        { id: 'language', label: 'Escolas de Idiomas', icon: 'languages' },
-        { id: 'tutor', label: 'Professores de Reforço', icon: 'book-open' },
-        { id: 'organizer', label: 'Personal Organizer', icon: 'layers' },
-        { id: 'club', label: 'Clubes de Assinatura', icon: 'gift' },
-        // Specialized
-        { id: 'nutri', label: 'Nutricionistas Esportivos', icon: 'activity' },
-        { id: 'physio', label: 'Fisioterapeutas de Coluna', icon: 'activity' },
-        { id: 'genetic', label: 'Geneticistas', icon: 'dna' },
-        { id: 'finance', label: 'Planejadores Financeiros D7', icon: 'dollar-sign' },
-        { id: 'visa', label: 'Assessores EB-5', icon: 'globe' },
-        { id: 'italy', label: 'Cidadania Italiana', icon: 'flag' },
-      ];
-
-      // --- UTILS ---
+      // --- HELPERS ---
       const sanitizePhone = (phone) => {
         if (!phone) return '';
-        let str = String(phone).replace(/\D/g, ''); // Remove non-digits
-        // Basic BR Logic
-        if (str.length === 0) return '';
-        if (str.length <= 9) return str; // Likely missing DDD, return as is (invalid)
+        let str = String(phone).replace(/\D/g, ''); 
+        if (str.length < 8) return ''; 
+        if (str.length <= 9) return str; // Likely missing DDD or local
+        // If 10 or 11 digits, assume BR format. 
         if (str.length === 10 || str.length === 11) str = '55' + str;
         return str;
       };
 
-      const generateLink = (phone, msg) => {
-        return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+      const getCityFromPhone = (phone) => {
+        // Expected format: 55 + DDD + NUM (12 or 13 digits)
+        if (!phone || phone.length < 12) return 'Desconhecido';
+        const ddd = phone.substring(2, 4); // Chars at index 2 and 3
+        return DDD_MAP[parseInt(ddd)] || `Região DDD ${ddd}`;
       };
 
-      // --- MAIN COMPONENT ---
+      const generateLink = (phone, msg) => `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+
+      // --- APP COMPONENT ---
       const App = () => {
         useLucide();
-        const [activeNiche, setActiveNiche] = useState(null); // Null = Home/Upload
+        const [activeView, setActiveView] = useState('home'); // home, history, reports, niche_ID
+        const [activeNiche, setActiveNiche] = useState(null);
+        
+        // Data State
         const [fileData, setFileData] = useState([]);
         const [fileName, setFileName] = useState('');
         const [headers, setHeaders] = useState([]);
-        const [mapStep, setMapStep] = useState(false); // Step 1: Uploaded, need mapping
+        const [mapStep, setMapStep] = useState(false);
         const [colName, setColName] = useState(-1);
         const [colPhone, setColPhone] = useState(-1);
+        
         const [leads, setLeads] = useState([]);
-        const [message, setMessage] = useState("Olá, tudo bem?");
+        const [message, setMessage] = useState("Olá! Vi seu contato e gostaria de falar sobre nossos serviços.");
+        
+        // History State
         const [history, setHistory] = useState([]);
-        const [viewHistory, setViewHistory] = useState(false);
 
-        // -- LOAD HISTORY --
+        // LOAD HISTORY ON MOUNT
         useEffect(() => {
-          const saved = localStorage.getItem('ZAPHUB_HISTORY');
+          const saved = localStorage.getItem('ZAPHUB_HISTORY_V2');
           if (saved) {
-            try {
-              setHistory(JSON.parse(saved));
-            } catch (e) { console.error("History parse error", e); }
+             try {
+               setHistory(JSON.parse(saved));
+             } catch (e) { console.error(e); }
           }
         }, []);
 
-        // -- FILE UPLOAD --
+        // --- UPLOAD LOGIC ---
         const handleFileUpload = (e) => {
           const file = e.target.files[0];
           if (!file) return;
@@ -168,430 +205,412 @@
           reader.onload = (evt) => {
             const bstr = evt.target.result;
             const wb = XLSX.read(bstr, { type: 'binary' });
-            const wsname = wb.SheetNames[0];
-            const ws = wb.Sheets[wsname];
-            // Get ALL data as array of arrays (no key guessing)
+            const ws = wb.Sheets[wb.SheetNames[0]];
             const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
             
-            if (data.length > 0) {
-              setFileData(data);
-              // Assume row 0 is header for preview, but let user choose
-              setHeaders(data[0].map((h, i) => ({ idx: i, val: h || `Coluna ${i+1}` })));
+            // CLEAN EMPTY TOP ROWS
+            let startIndex = 0;
+            // Scan first 20 rows to find a likely header row
+            for(let i=0; i<Math.min(data.length, 20); i++) {
+                const rowStr = JSON.stringify(data[i]).toLowerCase();
+                if(rowStr.includes('nome') || rowStr.includes('cliente') || rowStr.includes('aluno') || rowStr.includes('tel') || rowStr.includes('cel')) {
+                    startIndex = i;
+                    break;
+                }
+            }
+            
+            const cleanData = data.slice(startIndex);
+            
+            if (cleanData.length > 0) {
+              setFileData(cleanData);
+              // Set headers from the first row found
+              setHeaders(cleanData[0].map((h, i) => ({ idx: i, val: h || `Coluna ${i+1}` })));
               setMapStep(true);
               setColName(-1);
               setColPhone(-1);
+              setActiveView('home');
             }
           };
           reader.readAsBinaryString(file);
         };
 
-        // -- PROCESS LEADS --
+        // --- PROCESS ---
         const processLeads = () => {
           if (colName === -1 || colPhone === -1) {
-            alert("Por favor, selecione as colunas de NOME e TELEFONE.");
+            alert("Selecione as colunas de NOME e TELEFONE.");
             return;
           }
-
+          
           const processed = [];
-          // Start from row 1 (skip header)
           for (let i = 1; i < fileData.length; i++) {
-            const row = fileData[i];
-            const rawName = row[colName];
-            const rawPhone = row[colPhone];
+             const row = fileData[i];
+             if (!row) continue;
+             
+             const rawName = row[colName];
+             const rawPhone = row[colPhone];
+             
+             if (!rawName && !rawPhone) continue; // Skip empty rows
 
-            // STRICT RULE: If row exists, process it. Don't skip unless completely empty.
-            if (!rawName && !rawPhone) continue;
+             const cleanPhone = sanitizePhone(rawPhone);
+             const isValid = cleanPhone.length >= 12;
 
-            const cleanPhone = sanitizePhone(rawPhone);
-            const isValid = cleanPhone.length >= 12; // 55 + DDD + 8/9 digits
-
-            processed.push({
-              id: i,
-              name: rawName || 'Sem Nome',
-              rawPhone: rawPhone,
-              phone: cleanPhone,
-              status: isValid ? 'valid' : 'invalid',
-              link: isValid ? generateLink(cleanPhone, message) : '#',
-              sent: checkHistory(cleanPhone)
-            });
+             processed.push({
+               id: i,
+               name: rawName || 'Sem Nome',
+               rawPhone: rawPhone,
+               phone: cleanPhone,
+               status: isValid ? 'valid' : 'invalid',
+               link: isValid ? generateLink(cleanPhone, message) : '#',
+               sent: checkHistory(cleanPhone)
+             });
           }
-
           setLeads(processed);
           setMapStep(false);
-          setActiveNiche({ id: 'processing', label: 'Processamento de Lista' });
+          setActiveView('list');
         };
 
-        // -- HISTORY HELPERS --
-        const checkHistory = (phone) => {
-          return history.some(h => h.phone === phone);
-        };
+        // --- HISTORY LOGIC ---
+        const checkHistory = (phone) => history.some(h => h.phone === phone);
 
         const addToHistory = (lead) => {
           if (checkHistory(lead.phone)) return;
-          
+          const today = new Date();
           const newEntry = {
             phone: lead.phone,
             name: lead.name,
-            date: new Date().toLocaleString(),
+            timestamp: today.getTime(), // Store timestamp for accurate sorting/filtering
+            dateStr: today.toLocaleDateString('pt-BR'),
+            timeStr: today.toLocaleTimeString('pt-BR'),
             niche: activeNiche?.label || 'Geral'
           };
           
           const newHistory = [newEntry, ...history];
           setHistory(newHistory);
-          localStorage.setItem('ZAPHUB_HISTORY', JSON.stringify(newHistory));
-          
-          // Update local leads state
+          localStorage.setItem('ZAPHUB_HISTORY_V2', JSON.stringify(newHistory));
           setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, sent: true } : l));
         };
 
         const handleSend = (lead) => {
-          if (lead.status === 'invalid') return;
-          window.open(lead.link, '_blank');
-          addToHistory(lead);
-        };
-
-        const exportCSV = () => {
-          const ws = XLSX.utils.json_to_sheet(leads.map(l => ({
-            Nome: l.name,
-            Telefone: l.rawPhone,
-            Formatado: l.phone,
-            Link: l.link,
-            Status: l.sent ? 'Enviado' : 'Pendente'
-          })));
-          const wb = XLSX.utils.book_new();
-          XLSX.utils.book_append_sheet(wb, ws, "Leads");
-          XLSX.writeFile(wb, "ZapHub_Leads.csv");
+           if (lead.status !== 'valid') return;
+           window.open(lead.link, '_blank');
+           addToHistory(lead);
         };
 
         const copyAll = () => {
           const text = leads.filter(l => l.status === 'valid').map(l => `${l.name}: ${l.link}`).join('\n');
           navigator.clipboard.writeText(text);
-          alert("Todos os links copiados!");
+          alert("Links copiados!");
         };
 
         // --- RENDERERS ---
 
         const RenderSidebar = () => (
-          <div className="w-64 bg-primary text-gray-300 flex-shrink-0 hidden md:flex flex-col h-screen overflow-y-auto border-r border-gray-800">
+          <aside className="w-64 bg-primary text-gray-300 flex flex-col h-screen overflow-y-auto shrink-0 border-r border-gray-800">
             <div className="p-6">
               <h1 className="text-2xl font-serif font-bold text-white flex items-center">
-                <i data-lucide="zap" className="text-gold mr-2"></i> ZapHub
+                <span className="text-gold mr-2">⚡</span> ZapHub
               </h1>
             </div>
-            <nav className="flex-1 px-4 space-y-1">
-              <button 
-                onClick={() => { setActiveNiche(null); setViewHistory(false); }}
-                className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors ${!activeNiche && !viewHistory ? 'bg-gold text-primary font-bold' : 'hover:bg-gray-800'}`}
-              >
-                <i data-lucide="upload" className="w-5 h-5 mr-3"></i> Upload / Home
-              </button>
-              <button 
-                onClick={() => setViewHistory(true)}
-                className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors ${viewHistory ? 'bg-gold text-primary font-bold' : 'hover:bg-gray-800'}`}
-              >
-                <i data-lucide="history" className="w-5 h-5 mr-3"></i> Histórico
+            <nav className="flex-1 px-3 space-y-1">
+              <button onClick={() => { setActiveView('home'); setActiveNiche(null); }} className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors ${activeView === 'home' ? 'bg-gold text-primary font-bold' : 'hover:bg-gray-800'}`}>
+                <Icon name="upload" className="mr-3"/> Início / Upload
               </button>
               
-              <div className="mt-6 mb-2 px-4 text-xs font-semibold text-gray-500 uppercase">Nichos</div>
+              <button onClick={() => { setActiveView('reports'); setActiveNiche(null); }} className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors ${activeView === 'reports' ? 'bg-gold text-primary font-bold' : 'hover:bg-gray-800'}`}>
+                <Icon name="bar-chart-2" className="mr-3"/> Relatórios & Mapa
+              </button>
+
+              <button onClick={() => { setActiveView('history'); setActiveNiche(null); }} className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors ${activeView === 'history' ? 'bg-gold text-primary font-bold' : 'hover:bg-gray-800'}`}>
+                <Icon name="history" className="mr-3"/> Histórico
+              </button>
+
+              <div className="mt-6 mb-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nichos</div>
               {NICHES.map(niche => (
                 <button
                   key={niche.id}
-                  onClick={() => { setActiveNiche(niche); setViewHistory(false); }}
-                  className={`w-full flex items-center px-4 py-2 rounded-lg text-sm transition-colors ${activeNiche?.id === niche.id ? 'bg-gray-800 text-white border-l-4 border-gold' : 'hover:bg-gray-800'}`}
+                  onClick={() => { setActiveNiche(niche); setActiveView('niche'); }}
+                  className={`w-full flex items-center px-3 py-2 rounded-lg text-sm transition-colors ${activeNiche?.id === niche.id ? 'bg-gray-800 text-white border-l-2 border-gold' : 'hover:bg-gray-800'}`}
                 >
-                  <i data-lucide={niche.icon} className="w-4 h-4 mr-3 opacity-70"></i> {niche.label}
+                  <Icon name={niche.icon} className="mr-3 opacity-70" size={16}/> {niche.label}
                 </button>
               ))}
             </nav>
-          </div>
+          </aside>
         );
 
-        const RenderHistory = () => (
-          <div className="p-8 animate-fade-in">
-            <h2 className="text-3xl font-serif font-bold text-primary mb-6">Histórico de Envios</h2>
-            <div className="bg-white rounded-xl shadow overflow-hidden">
-               <table className="w-full text-left">
-                 <thead className="bg-gray-100 border-b">
-                   <tr>
-                     <th className="p-4">Nome</th>
-                     <th className="p-4">Telefone</th>
-                     <th className="p-4">Nicho</th>
-                     <th className="p-4">Data</th>
-                   </tr>
-                 </thead>
-                 <tbody className="divide-y">
-                   {history.map((h, i) => (
-                     <tr key={i} className="hover:bg-gray-50">
-                       <td className="p-4 font-medium text-gray-800">{h.name}</td>
-                       <td className="p-4 text-gray-600">{h.phone}</td>
-                       <td className="p-4"><span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">{h.niche}</span></td>
-                       <td className="p-4 text-gray-500 text-sm">{h.date}</td>
-                     </tr>
-                   ))}
-                   {history.length === 0 && (
-                     <tr><td colSpan="4" className="p-8 text-center text-gray-500">Nenhum envio registrado ainda.</td></tr>
-                   )}
-                 </tbody>
-               </table>
-            </div>
-            <button onClick={() => { localStorage.removeItem('ZAPHUB_HISTORY'); setHistory([]); }} className="mt-4 text-red-600 text-sm hover:underline">
-              Limpar Histórico Completo
-            </button>
-          </div>
-        );
-
-        const RenderMappingStep = () => (
-          <div className="p-8">
-            <div className="bg-white rounded-xl shadow-lg p-8 max-w-2xl mx-auto border-t-4 border-gold">
-              <h2 className="text-2xl font-bold mb-4 flex items-center">
-                <i data-lucide="table" className="mr-2 text-primary"></i> Mapear Colunas
-              </h2>
-              <p className="mb-6 text-gray-600">Para garantir precisão total, identifique quais colunas representam o Nome e o Número no seu arquivo <strong>{fileName}</strong>.</p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Coluna de NOME</label>
-                  <select 
-                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-gold outline-none"
-                    value={colName} 
-                    onChange={e => setColName(Number(e.target.value))}
-                  >
-                    <option value="-1">Selecione...</option>
-                    {headers.map(h => <option key={h.idx} value={h.idx}>{h.val} (Ex: {fileData[1]?.[h.idx]})</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Coluna de WHATSAPP</label>
-                  <select 
-                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-gold outline-none"
-                    value={colPhone} 
-                    onChange={e => setColPhone(Number(e.target.value))}
-                  >
-                    <option value="-1">Selecione...</option>
-                    {headers.map(h => <option key={h.idx} value={h.idx}>{h.val} (Ex: {fileData[1]?.[h.idx]})</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <button 
-                  onClick={processLeads}
-                  className="bg-primary text-white px-6 py-3 rounded-lg font-bold hover:bg-gray-800 transition-colors flex items-center"
-                >
-                  Processar Lista <i data-lucide="arrow-right" className="ml-2 w-4 h-4"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-
-        const RenderLeadsTable = () => {
-          const validCount = leads.filter(l => l.status === 'valid').length;
-          const sentCount = leads.filter(l => l.sent).length;
-
-          return (
-            <div className="p-6 md:p-8 max-w-7xl mx-auto">
-              {/* Header Info */}
-              <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-                <div>
-                  <h2 className="text-3xl font-serif font-bold text-primary mb-2">
-                    {activeNiche?.label || 'Processamento Geral'}
-                  </h2>
-                  <div className="flex gap-2">
-                    <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">{leads.length} Leads</span>
-                    <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">{validCount} Válidos</span>
-                    <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium">{sentCount} Já Enviados</span>
-                  </div>
-                </div>
-                <div className="flex gap-2 w-full md:w-auto">
-                  <button onClick={copyAll} className="flex-1 md:flex-none bg-white border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center justify-center">
-                    <i data-lucide="copy" className="w-4 h-4 mr-2"></i> Copiar Tudo
-                  </button>
-                  <button onClick={exportCSV} className="flex-1 md:flex-none bg-white border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center justify-center">
-                    <i data-lucide="download" className="w-4 h-4 mr-2"></i> CSV
-                  </button>
-                </div>
-              </div>
-
-              {/* Message Config */}
-              <div className="bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-200">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Mensagem Padrão</label>
-                <div className="flex gap-2">
-                  <input 
-                    className="flex-1 border p-2 rounded-lg" 
-                    value={message} 
-                    onChange={e => {
-                      setMessage(e.target.value);
-                      setLeads(prev => prev.map(l => ({...l, link: generateLink(l.phone, e.target.value)})));
-                    }}
-                  />
-                  <button className="bg-gray-100 px-4 rounded-lg text-gray-600 hover:bg-gray-200" title="Atualizar links">
-                    <i data-lucide="refresh-cw" className="w-4 h-4"></i>
-                  </button>
-                </div>
-              </div>
-
-              {/* Table */}
-              <div className="bg-white rounded-xl shadow overflow-hidden border border-gray-200">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                      <tr>
-                        <th className="p-4 border-b">Status</th>
-                        <th className="p-4 border-b">Nome</th>
-                        <th className="p-4 border-b">Número (Formatado)</th>
-                        <th className="p-4 border-b text-right">Ação</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 text-sm">
-                      {leads.map(lead => (
-                        <tr key={lead.id} className={lead.status === 'invalid' ? 'bg-red-50' : (lead.sent ? 'bg-green-50' : 'hover:bg-gray-50')}>
-                          <td className="p-4">
-                            {lead.status === 'invalid' ? 
-                              <span className="text-red-600 font-bold text-xs">INVÁLIDO</span> :
-                              (lead.sent ? 
-                                <span className="text-green-600 font-bold text-xs flex items-center"><i data-lucide="check" className="w-3 h-3 mr-1"></i> ENVIADO</span> : 
-                                <span className="text-gray-400 font-bold text-xs">PENDENTE</span>
-                              )
-                            }
-                          </td>
-                          <td className="p-4 font-medium text-gray-900">{lead.name}</td>
-                          <td className="p-4 text-gray-600 font-mono">
-                            {lead.status === 'valid' ? lead.phone : <span className="line-through opacity-50">{lead.rawPhone}</span>}
-                          </td>
-                          <td className="p-4 text-right">
-                            {lead.status === 'valid' && (
-                              <button 
-                                onClick={() => handleSend(lead)}
-                                className={`inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold transition-transform active:scale-95 ${lead.sent ? 'bg-white border border-green-500 text-green-600' : 'bg-[#25D366] text-white shadow-lg hover:shadow-xl'}`}
-                              >
-                                {lead.sent ? 'Reenviar' : 'Enviar WhatsApp'} 
-                                <i data-lucide="send" className="ml-1.5 w-3 h-3"></i>
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          );
-        };
-
-        const RenderHome = () => (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50 h-full">
-            <div className="max-w-md w-full text-center">
-              <div className="w-20 h-20 bg-primary rounded-2xl mx-auto flex items-center justify-center mb-6 shadow-2xl">
-                <i data-lucide="zap" className="text-gold w-10 h-10"></i>
-              </div>
-              <h1 className="text-4xl font-serif font-bold text-primary mb-2">ZapHub Pro</h1>
-              <p className="text-gray-500 mb-8">Central de automação para geração de leads.</p>
-
-              <div className="bg-white p-8 rounded-xl shadow-lg border-2 border-dashed border-gray-300 hover:border-gold transition-colors cursor-pointer relative">
-                <input 
-                  type="file" 
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  onChange={handleFileUpload}
-                  accept=".csv, .xlsx, .xls"
-                />
-                <i data-lucide="file-spreadsheet" className="w-12 h-12 text-gray-400 mx-auto mb-4"></i>
-                <h3 className="text-lg font-bold text-gray-700">Importar Planilha</h3>
-                <p className="text-sm text-gray-400 mt-2">Arraste ou clique para selecionar (.xlsx, .csv)</p>
-              </div>
-
-              <div className="mt-8 grid grid-cols-2 gap-4">
-                <div className="bg-white p-4 rounded-lg shadow-sm text-left">
-                  <div className="text-gold font-bold text-xl mb-1">100%</div>
-                  <div className="text-xs text-gray-500">Precisão de Leitura</div>
-                </div>
-                <div className="bg-white p-4 rounded-lg shadow-sm text-left">
-                  <div className="text-gold font-bold text-xl mb-1">Local</div>
-                  <div className="text-xs text-gray-500">Privacidade Total</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-        // --- NICHE SPECIFIC WRAPPER ---
-        // If a niche is active but NO file is loaded, show the Niche "Home"
-        // If file loaded, show processing table inside Niche context
-        const RenderNicheView = () => {
-           if (leads.length > 0) return <RenderLeadsTable />;
-           if (mapStep) return <RenderMappingStep />;
+        const RenderReports = () => {
+           // Calc Stats
+           const total = history.length;
+           const todayDate = new Date().toLocaleDateString('pt-BR');
+           const todayCount = history.filter(h => h.dateStr === todayDate).length;
+           
+           // Geo Stats
+           const geoMap = {};
+           history.forEach(h => {
+              const city = getCityFromPhone(h.phone);
+              geoMap[city] = (geoMap[city] || 0) + 1;
+           });
+           
+           const sortedGeo = Object.entries(geoMap).sort((a,b) => b[1] - a[1]);
 
            return (
-             <div className="p-8 h-full flex flex-col">
-               <div className="flex items-center mb-8">
-                 <div className="p-3 bg-white rounded-lg shadow-sm mr-4">
-                   <i data-lucide={activeNiche.icon} className="text-primary w-6 h-6"></i>
-                 </div>
-                 <h1 className="text-3xl font-serif font-bold text-primary">{activeNiche.label}</h1>
-               </div>
+             <div className="p-8 animate-fade-in w-full max-w-6xl mx-auto">
+                <h2 className="text-3xl font-serif font-bold text-primary mb-6 flex items-center">
+                  <Icon name="pie-chart" className="mr-3 text-gold" size={32}/> Relatórios de Performance
+                </h2>
+                
+                {/* Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                   <div className="bg-white p-6 rounded-xl shadow border-l-4 border-blue-500">
+                      <div className="text-gray-500 text-sm font-bold uppercase mb-1">Total Enviado</div>
+                      <div className="text-4xl font-bold text-primary">{total}</div>
+                      <div className="text-xs text-gray-400 mt-2">Mensagens vitalícias</div>
+                   </div>
+                   <div className="bg-white p-6 rounded-xl shadow border-l-4 border-green-500">
+                      <div className="text-gray-500 text-sm font-bold uppercase mb-1">Enviados Hoje</div>
+                      <div className="text-4xl font-bold text-green-600">{todayCount}</div>
+                      <div className="text-xs text-gray-400 mt-2">{todayDate}</div>
+                   </div>
+                   <div className="bg-white p-6 rounded-xl shadow border-l-4 border-gold">
+                      <div className="text-gray-500 text-sm font-bold uppercase mb-1">Top Região</div>
+                      <div className="text-2xl font-bold text-gold-dark truncate">
+                        {sortedGeo.length > 0 ? sortedGeo[0][0] : '-'}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-2">Maior volume de leads</div>
+                   </div>
+                </div>
 
-               {/* Niche Specific Feature Demo */}
-               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                 <div className="lg:col-span-2 bg-gradient-to-r from-primary to-slate-900 rounded-2xl p-8 text-white relative overflow-hidden shadow-xl">
-                    <div className="relative z-10">
-                      <h3 className="text-xl font-bold mb-2">Ferramenta Especializada</h3>
-                      <p className="text-gray-400 mb-6">Este módulo contém configurações otimizadas para {activeNiche.label}, incluindo scripts de alta conversão.</p>
-                      <button onClick={() => document.getElementById('niche-upload').click()} className="bg-gold text-primary px-6 py-2 rounded-lg font-bold hover:bg-white transition-colors">
-                        Começar Agora
-                      </button>
-                      <input id="niche-upload" type="file" className="hidden" onChange={handleFileUpload} accept=".xlsx,.csv" />
-                    </div>
-                    <i data-lucide={activeNiche.icon} className="absolute right-[-20px] bottom-[-20px] w-48 h-48 text-white opacity-5"></i>
-                 </div>
-                 
-                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col justify-center items-center text-center">
-                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-4">
-                      <i data-lucide="message-circle" className="w-6 h-6"></i>
-                    </div>
-                    <h4 className="font-bold text-gray-800">Script Sugerido</h4>
-                    <p className="text-xs text-gray-500 mt-2 italic">"Olá [Nome], vi que você tem interesse em {activeNiche.label.split(' ')[0]}..."</p>
-                    <button className="mt-4 text-xs text-primary font-bold hover:underline" onClick={() => navigator.clipboard.writeText(`Olá [Nome], vi que você tem interesse em ${activeNiche.label}...`)}>Copiar Script</button>
-                 </div>
-               </div>
+                {/* Geo Table */}
+                <div className="bg-white rounded-xl shadow overflow-hidden">
+                   <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                     <h3 className="font-bold text-lg text-gray-800">Mapa de Calor (Por DDD)</h3>
+                     <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">Baseado no histórico</span>
+                   </div>
+                   <div className="p-0 overflow-x-auto">
+                     <table className="w-full text-left">
+                       <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                         <tr>
+                           <th className="p-4">Região / Cidade</th>
+                           <th className="p-4 w-32 text-right">Envios</th>
+                           <th className="p-4 w-64">% do Total</th>
+                         </tr>
+                       </thead>
+                       <tbody className="divide-y divide-gray-100">
+                         {sortedGeo.map(([city, count], i) => (
+                           <tr key={i} className="hover:bg-blue-50 transition-colors">
+                             <td className="p-4 font-medium text-gray-700">{city}</td>
+                             <td className="p-4 text-right font-bold text-primary">{count}</td>
+                             <td className="p-4">
+                               <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                 <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${(count/total)*100}%` }}></div>
+                               </div>
+                             </td>
+                           </tr>
+                         ))}
+                         {sortedGeo.length === 0 && (
+                           <tr><td colSpan="3" className="p-8 text-center text-gray-400">Sem dados suficientes ainda.</td></tr>
+                         )}
+                       </tbody>
+                     </table>
+                   </div>
+                </div>
              </div>
            );
         };
 
+        const RenderHome = () => (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50 h-full">
+            <div className="max-w-xl w-full text-center">
+               <div className="inline-block p-4 bg-primary rounded-2xl shadow-2xl mb-6">
+                 <Icon name="zap" className="text-gold w-12 h-12" />
+               </div>
+               <h1 className="text-4xl font-serif font-bold text-primary mb-2">ZapHub Pro</h1>
+               <p className="text-gray-600 mb-8 text-lg">Central de automação de WhatsApp para múltiplos nichos.</p>
+               
+               <div className="bg-white p-8 rounded-xl shadow-lg border-2 border-dashed border-gray-300 hover:border-gold transition-colors relative cursor-pointer group">
+                  <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={handleFileUpload} accept=".csv, .xlsx, .xls" />
+                  <div className="group-hover:scale-105 transition-transform duration-300">
+                    <Icon name="file-spreadsheet" className="w-16 h-16 text-gray-300 mx-auto mb-4 group-hover:text-gold"/>
+                    <h3 className="text-xl font-bold text-gray-700">Importar Lista de Leads</h3>
+                    <p className="text-sm text-gray-400 mt-2">Arraste ou clique para selecionar (.xlsx / .csv)</p>
+                  </div>
+               </div>
+               
+               <div className="mt-8 flex justify-center gap-8 text-gray-400 text-sm">
+                  <span className="flex items-center"><Icon name="shield" size={14} className="mr-1"/> 100% Seguro (Local)</span>
+                  <span className="flex items-center"><Icon name="infinity" size={14} className="mr-1"/> Envios Ilimitados</span>
+               </div>
+            </div>
+          </div>
+        );
+        
+        const RenderMapping = () => (
+           <div className="p-8 flex justify-center items-start pt-20 h-full">
+             <div className="bg-white p-8 rounded-xl shadow-xl max-w-2xl w-full border-t-4 border-gold">
+                <h2 className="text-2xl font-bold mb-2 flex items-center text-primary">
+                  <Icon name="table" className="mr-2"/> Mapeamento de Colunas
+                </h2>
+                <p className="text-gray-500 mb-6">Identifique as colunas corretas do arquivo <strong>{fileName}</strong>.</p>
+                
+                <div className="grid grid-cols-2 gap-6 mb-8">
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-2">Coluna de NOME</label>
+                    <select className="w-full p-3 border rounded focus:ring-2 focus:ring-gold" value={colName} onChange={e => setColName(Number(e.target.value))}>
+                       <option value="-1">Selecione...</option>
+                       {headers.map(h => <option key={h.idx} value={h.idx}>{h.val}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-2">Coluna de CELULAR</label>
+                    <select className="w-full p-3 border rounded focus:ring-2 focus:ring-gold" value={colPhone} onChange={e => setColPhone(Number(e.target.value))}>
+                       <option value="-1">Selecione...</option>
+                       {headers.map(h => <option key={h.idx} value={h.idx}>{h.val}</option>)}
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 p-4 rounded text-sm text-gray-500 mb-6">
+                   <strong>Preview (Linha 1):</strong><br/>
+                   Nome: {colName !== -1 ? fileData[1]?.[colName] : '...'} <br/>
+                   Tel: {colPhone !== -1 ? fileData[1]?.[colPhone] : '...'}
+                </div>
+
+                <button onClick={processLeads} className="w-full bg-primary text-white py-4 rounded-lg font-bold hover:bg-gray-800 shadow-lg flex justify-center items-center">
+                   Processar Lista <Icon name="arrow-right" className="ml-2"/>
+                </button>
+             </div>
+           </div>
+        );
+        
+        const RenderList = () => {
+           const validLeads = leads.filter(l => l.status === 'valid');
+           
+           return (
+             <div className="p-6 md:p-8 max-w-7xl mx-auto h-full flex flex-col">
+                <div className="flex justify-between items-end mb-6">
+                   <div>
+                     <h2 className="text-3xl font-serif font-bold text-primary">{activeNiche?.label || 'Lista Geral'}</h2>
+                     <p className="text-gray-500">{validLeads.length} contatos válidos prontos para envio.</p>
+                   </div>
+                   <div className="space-x-2">
+                     <button onClick={copyAll} className="px-4 py-2 bg-white border rounded hover:bg-gray-50 text-sm font-medium">Copiar Links</button>
+                   </div>
+                </div>
+                
+                <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex gap-2 border border-gray-200">
+                   <input className="flex-1 border-none outline-none text-gray-700" value={message} onChange={e => {
+                      setMessage(e.target.value);
+                      setLeads(prev => prev.map(l => ({...l, link: generateLink(l.phone, e.target.value)})));
+                   }} />
+                   <button className="text-gray-400 hover:text-gold"><Icon name="edit-2"/></button>
+                </div>
+
+                <div className="flex-1 bg-white rounded-xl shadow overflow-hidden flex flex-col border border-gray-200">
+                   <div className="overflow-y-auto flex-1">
+                      <table className="w-full text-left">
+                        <thead className="bg-gray-50 text-gray-500 text-xs uppercase sticky top-0">
+                          <tr>
+                             <th className="p-4 w-24">Status</th>
+                             <th className="p-4">Nome</th>
+                             <th className="p-4">Telefone</th>
+                             <th className="p-4 text-right">Ação</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {leads.map(lead => (
+                            <tr key={lead.id} className={lead.status === 'invalid' ? 'bg-red-50' : (lead.sent ? 'bg-green-50' : 'hover:bg-gray-50')}>
+                               <td className="p-4">
+                                 {lead.status === 'invalid' ? <span className="text-red-500 font-bold text-xs">ERRO</span> : 
+                                  lead.sent ? <span className="text-green-600 font-bold text-xs flex items-center"><Icon name="check" size={12} className="mr-1"/> OK</span> : 
+                                  <span className="text-gray-400 text-xs">PEND</span>
+                                 }
+                               </td>
+                               <td className="p-4 font-medium text-gray-900">{lead.name}</td>
+                               <td className="p-4 text-gray-600 font-mono text-sm">{lead.status === 'valid' ? lead.phone : lead.rawPhone}</td>
+                               <td className="p-4 text-right">
+                                 {lead.status === 'valid' && (
+                                   <button onClick={() => handleSend(lead)} className={`px-4 py-1 rounded-full text-xs font-bold transition-all ${lead.sent ? 'border border-green-500 text-green-600 bg-white' : 'bg-[#25D366] text-white hover:shadow-lg hover:scale-105'}`}>
+                                     {lead.sent ? 'Reenviar' : 'Enviar WhatsApp'}
+                                   </button>
+                                 )}
+                               </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                   </div>
+                </div>
+             </div>
+           );
+        };
+        
+        const RenderHistory = () => (
+          <div className="p-8 max-w-6xl mx-auto animate-fade-in">
+             <div className="flex justify-between items-center mb-6">
+               <h2 className="text-3xl font-serif font-bold text-primary">Histórico de Envios</h2>
+               <button onClick={() => { if(confirm('Apagar tudo?')) { localStorage.removeItem('ZAPHUB_HISTORY_V2'); setHistory([]); } }} className="text-red-500 text-sm hover:underline">Limpar Tudo</button>
+             </div>
+             
+             <div className="bg-white rounded-xl shadow overflow-hidden">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                    <tr>
+                      <th className="p-4">Nome</th>
+                      <th className="p-4">Telefone</th>
+                      <th className="p-4">Região</th>
+                      <th className="p-4">Data</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {history.map((h, i) => (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="p-4 font-medium">{h.name}</td>
+                        <td className="p-4 font-mono text-gray-600">{h.phone}</td>
+                        <td className="p-4 text-sm text-blue-600 font-medium">{getCityFromPhone(h.phone)}</td>
+                        <td className="p-4 text-sm text-gray-400">{h.dateStr} às {h.timeStr}</td>
+                      </tr>
+                    ))}
+                    {history.length === 0 && <tr><td colSpan="4" className="p-8 text-center text-gray-400">Nenhum histórico encontrado.</td></tr>}
+                  </tbody>
+                </table>
+             </div>
+          </div>
+        );
+
         // --- MAIN RENDER ---
         return (
           <div className="flex h-screen overflow-hidden bg-gray-50">
-            <RenderSidebar />
-            <div className="flex-1 flex flex-col h-screen overflow-auto relative">
-              
-              {/* Mobile Header */}
-              <div className="md:hidden bg-primary text-white p-4 flex justify-between items-center shadow-md z-10">
-                 <span className="font-bold font-serif">ZapHub</span>
-                 <button onClick={() => setActiveNiche(null)}><i data-lucide="menu"></i></button>
-              </div>
-
-              {/* View Router */}
-              {viewHistory ? (
-                <RenderHistory />
-              ) : activeNiche ? (
-                <RenderNicheView />
-              ) : mapStep ? (
-                <RenderMappingStep />
-              ) : leads.length > 0 ? (
-                <RenderLeadsTable />
-              ) : (
-                <RenderHome />
-              )}
-
-              {/* Floating WhatsApp Global */}
-              <a 
-                href="https://wa.me/?text=Suporte" 
-                target="_blank" 
-                className="fixed bottom-6 right-6 bg-[#25D366] hover:bg-[#20ba56] text-white p-4 rounded-full shadow-2xl transition-transform hover:scale-110 z-50 flex items-center justify-center"
-              >
-                <i data-lucide="message-circle" className="w-8 h-8 fill-current"></i>
-              </a>
-            </div>
+             <RenderSidebar />
+             <main className="flex-1 flex flex-col relative overflow-y-auto">
+                {activeView === 'home' && <RenderHome />}
+                {activeView === 'reports' && <RenderReports />}
+                {activeView === 'history' && <RenderHistory />}
+                {activeView === 'list' && <RenderList />}
+                {(activeView === 'niche' || mapStep) && !mapStep && leads.length === 0 && (
+                   // Niche Landing View
+                   <div className="p-8">
+                      <div className="flex items-center mb-6">
+                        <div className="p-3 bg-white rounded shadow-sm mr-4"><Icon name={activeNiche?.icon || 'zap'} className="text-primary"/></div>
+                        <h1 className="text-3xl font-serif font-bold text-primary">{activeNiche?.label}</h1>
+                      </div>
+                      <div className="bg-gradient-to-r from-primary to-gray-800 rounded-2xl p-8 text-white shadow-xl mb-8 relative overflow-hidden">
+                         <div className="relative z-10">
+                           <h3 className="text-2xl font-bold mb-2">Módulo Especializado</h3>
+                           <p className="text-gray-300 mb-6 max-w-lg">Otimizado para geração de leads em {activeNiche?.label}. Carregue sua lista para começar.</p>
+                           <button onClick={() => document.getElementById('niche-upload').click()} className="bg-gold text-primary px-6 py-3 rounded-lg font-bold hover:bg-white transition-colors">Carregar Planilha Agora</button>
+                           <input id="niche-upload" type="file" className="hidden" onChange={handleFileUpload} accept=".xlsx,.csv" />
+                         </div>
+                         <Icon name={activeNiche?.icon || 'zap'} size={200} className="absolute right-[-40px] bottom-[-40px] opacity-10"/>
+                      </div>
+                   </div>
+                )}
+                {mapStep && <RenderMapping />}
+             </main>
+             
+             {/* Floating WhatsApp */}
+             <a href="https://wa.me/?text=Suporte" target="_blank" className="fixed bottom-6 right-6 bg-[#25D366] text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform z-50">
+               <Icon name="message-circle" size={32} className="fill-current"/>
+             </a>
           </div>
         );
       };
