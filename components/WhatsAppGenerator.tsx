@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback } from 'react';
 import { Upload, FileSpreadsheet, Download, RefreshCw, Send, CheckCircle, AlertCircle, Copy, FileText } from 'lucide-react';
 import { parseFile, sanitizePhoneNumber, generateWhatsAppLink, extractLeadsFromText } from '../services/dataProcessing';
@@ -14,6 +15,17 @@ export const WhatsAppGenerator: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
 
+  const logProspecion = () => {
+    const savedStats = localStorage.getItem('ZAPHUB_STATS_V1');
+    let stats = savedStats ? JSON.parse(savedStats) : { sentLog: [], revenueLog: [] };
+    
+    stats.sentLog.push(new Date().toISOString());
+    localStorage.setItem('ZAPHUB_STATS_V1', JSON.stringify(stats));
+    
+    // Trigger custom event to update App component
+    window.dispatchEvent(new Event('storage_stats_updated'));
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -23,7 +35,6 @@ export const WhatsAppGenerator: React.FC = () => {
       const data = await parseFile(file);
       if (data && data.length > 0) {
         setRawData(data);
-        // Reset mapping to force user selection or auto-detect
         setColumnMapping(null); 
         autoDetectColumns(data);
       }
@@ -53,11 +64,10 @@ export const WhatsAppGenerator: React.FC = () => {
       };
     });
     setLeads(processed);
-    setRawData([]); // Clear excel data if using paste
+    setRawData([]); 
   };
 
   const autoDetectColumns = (data: any[][]) => {
-    // Simple heuristic: look for "nome" and "telefone" in first row
     const headers = data[0].map((h: any) => String(h).toLowerCase());
     const nameIdx = headers.findIndex(h => h.includes('nome') || h.includes('name') || h.includes('cliente'));
     const phoneIdx = headers.findIndex(h => h.includes('tel') || h.includes('cel') || h.includes('phone') || h.includes('contato') || h.includes('whatsapp'));
@@ -65,8 +75,6 @@ export const WhatsAppGenerator: React.FC = () => {
     if (nameIdx >= 0 && phoneIdx >= 0) {
       setColumnMapping({ name: nameIdx, phone: phoneIdx });
       processLeads(data, nameIdx, phoneIdx);
-    } else {
-      // If we can't detect, we don't process yet, UI will show column selector
     }
   };
 
@@ -83,7 +91,7 @@ export const WhatsAppGenerator: React.FC = () => {
         generatedLink: generateWhatsAppLink(sanitized, message),
         message: message
       };
-    }).filter(l => l.originalPhone); // Filter out empty rows
+    }).filter(l => l.originalPhone);
     setLeads(processed);
   }, [message]);
 
@@ -94,7 +102,6 @@ export const WhatsAppGenerator: React.FC = () => {
 
   const handleMessageChange = (newMessage: string) => {
     setMessage(newMessage);
-    // Regenerate links with new message
     setLeads(prev => prev.map(lead => ({
       ...lead,
       message: newMessage,
@@ -124,6 +131,12 @@ export const WhatsAppGenerator: React.FC = () => {
     link.click();
   };
 
+  const handleSendClick = (link: string, leadId: string) => {
+    window.open(link, '_blank');
+    logProspecion();
+    // Mark as sent locally if needed (UI feedback)
+  };
+
   const validLeadsCount = leads.filter(l => l.status === 'valid').length;
 
   return (
@@ -141,7 +154,6 @@ export const WhatsAppGenerator: React.FC = () => {
       </div>
 
       <div className="p-6">
-        {/* Tabs */}
         <div className="flex space-x-4 mb-6 border-b border-gray-200">
           <button 
             onClick={() => setActiveTab('upload')}
@@ -157,7 +169,6 @@ export const WhatsAppGenerator: React.FC = () => {
           </button>
         </div>
 
-        {/* Input Area */}
         <div className="mb-8 p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 transition-all hover:border-primary/50">
           {activeTab === 'upload' ? (
             <div className="flex flex-col items-center justify-center text-center">
@@ -191,25 +202,24 @@ export const WhatsAppGenerator: React.FC = () => {
           )}
         </div>
 
-        {/* Column Mapping (If needed) */}
         {rawData.length > 0 && !columnMapping && (
-          <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg animate-fade-in">
             <h3 className="font-bold text-yellow-800 mb-2 flex items-center">
               <AlertCircle className="w-5 h-5 mr-2" />
               Mapeamento de Colunas Necessário
             </h3>
-            <p className="text-sm text-yellow-700 mb-4">Não conseguimos identificar automaticamente. Por favor, selecione as colunas:</p>
+            <p className="text-sm text-yellow-700 mb-4">Selecione manualmente as colunas para processar:</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Coluna de Nome</label>
                 <select id="nameCol" className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md">
-                   {rawData[0].map((h: any, i: number) => <option key={i} value={i}>{h}</option>)}
+                   {rawData[0].map((h: any, i: number) => <option key={i} value={i}>{h || `Coluna ${i+1}`}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Coluna de Telefone</label>
                 <select id="phoneCol" className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md">
-                   {rawData[0].map((h: any, i: number) => <option key={i} value={i}>{h}</option>)}
+                   {rawData[0].map((h: any, i: number) => <option key={i} value={i}>{h || `Coluna ${i+1}`}</option>)}
                 </select>
               </div>
             </div>
@@ -223,7 +233,6 @@ export const WhatsAppGenerator: React.FC = () => {
           </div>
         )}
 
-        {/* Config & Output */}
         {leads.length > 0 && (
           <div className="animate-fade-in">
             <div className="mb-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -254,11 +263,6 @@ export const WhatsAppGenerator: React.FC = () => {
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
                  <span className="font-semibold text-gray-700">Leads Processados ({validLeadsCount})</span>
-                 {leads.length - validLeadsCount > 0 && (
-                   <span className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded-full border border-red-100">
-                     {leads.length - validLeadsCount} inválidos
-                   </span>
-                 )}
                </div>
                <div className="max-h-96 overflow-y-auto">
                  <table className="min-w-full divide-y divide-gray-200">
@@ -278,14 +282,12 @@ export const WhatsAppGenerator: React.FC = () => {
                          </td>
                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                            {lead.status === 'valid' ? (
-                             <a 
-                               href={lead.generatedLink} 
-                               target="_blank" 
-                               rel="noreferrer"
+                             <button 
+                               onClick={() => handleSendClick(lead.generatedLink, lead.id)}
                                className="inline-flex items-center text-green-600 hover:text-green-900 font-bold"
                              >
                                Enviar <Send className="w-4 h-4 ml-1" />
-                             </a>
+                             </button>
                            ) : (
                              <span className="text-gray-400 cursor-not-allowed">Inválido</span>
                            )}

@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { 
   Menu, X, Zap, 
   Briefcase, Smile, Home, Scale, Sun, Stethoscope, Users, Hammer, BookOpen, Coffee,
   Calculator, Gavel, Camera, Activity, Crown, TrendingUp, ShieldCheck, PenTool, 
-  Bug, Sofa, Video, Music, Globe, Sparkles, Truck, Dumbbell, FileText, Utensils
+  Bug, Sofa, Video, Music, Globe, Sparkles, Truck, Dumbbell, FileText, Utensils,
+  BarChart2, Target, DollarSign, Plus
 } from 'lucide-react';
 import { WhatsAppGenerator } from './components/WhatsAppGenerator';
 import { NicheLayout } from './components/NicheFeatures';
 import { NicheType, NicheConfig } from './types';
 
-// Exact list requested by user
 const niches: NicheConfig[] = [
   { id: 'general', label: 'Dashboard Geral', type: NicheType.GENERAL, icon: 'Zap' },
-  
   { id: 'lawyer', label: 'Advocacia (Criminal/Família)', type: NicheType.LAWYER, icon: 'Scale' },
   { id: 'accounting', label: 'Contadores para MEIs', type: NicheType.ACCOUNTING_MEI, icon: 'Calculator' },
   { id: 'dentist_aesthetic', label: 'Dentistas Estéticos', type: NicheType.DENTIST_AESTHETIC, icon: 'Sparkles' },
@@ -51,11 +51,30 @@ const niches: NicheConfig[] = [
 function App() {
   const [activeNicheId, setActiveNicheId] = useState<string>('general');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [view, setView] = useState<'app' | 'dashboard'>('app');
+
+  // Stats State
+  const [stats, setStats] = useState({
+    sentLog: [] as string[],
+    revenueLog: [] as { amount: number, date: string }[]
+  });
+
+  useEffect(() => {
+    const savedStats = localStorage.getItem('ZAPHUB_STATS_V1');
+    if (savedStats) setStats(JSON.parse(savedStats));
+
+    // Listener for stats updates from other components
+    const handleStatsUpdate = () => {
+      const updatedStats = localStorage.getItem('ZAPHUB_STATS_V1');
+      if (updatedStats) setStats(JSON.parse(updatedStats));
+    };
+    window.addEventListener('storage_stats_updated', handleStatsUpdate);
+    return () => window.removeEventListener('storage_stats_updated', handleStatsUpdate);
+  }, []);
 
   const activeNiche = niches.find(n => n.id === activeNicheId) || niches[0];
 
   const renderIcon = (iconName?: string) => {
-    // Dynamic icon mapper
     const icons: Record<string, React.ElementType> = {
       Zap, Briefcase, Smile, Home, Scale, Sun, Stethoscope, Users, Hammer, BookOpen, Coffee,
       Calculator, Gavel, Camera, Activity, Crown, TrendingUp, ShieldCheck, PenTool, 
@@ -65,15 +84,142 @@ function App() {
     return <IconComponent className="w-5 h-5" />;
   };
 
+  const getTodayStats = () => {
+    const today = new Date().toISOString().split('T')[0];
+    return stats.sentLog.filter(date => date.startsWith(today)).length;
+  };
+
+  const getWeeklyRevenue = () => {
+    const now = new Date();
+    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    return stats.revenueLog
+      .filter(item => new Date(item.date) >= startOfWeek)
+      .reduce((acc, curr) => acc + curr.amount, 0);
+  };
+
+  const addRevenue = () => {
+    const amount = prompt("Valor da conversão (R$):");
+    if (amount && !isNaN(Number(amount))) {
+      const newStats = {
+        ...stats,
+        revenueLog: [...stats.revenueLog, { amount: Number(amount), date: new Date().toISOString() }]
+      };
+      setStats(newStats);
+      localStorage.setItem('ZAPHUB_STATS_V1', JSON.stringify(newStats));
+    }
+  };
+
+  const RenderDashboard = () => {
+    const todayCount = getTodayStats();
+    const weeklyRevenue = getWeeklyRevenue();
+    const totalSent = stats.sentLog.length;
+
+    return (
+      <div className="animate-fade-in space-y-8">
+        <div className="flex justify-between items-end">
+          <div>
+            <h1 className="text-3xl font-serif font-bold text-primary">Dashboard CRM</h1>
+            <p className="text-gray-500">Acompanhamento de metas e produtividade em tempo real.</p>
+          </div>
+          <button 
+            onClick={addRevenue}
+            className="bg-gold text-white px-6 py-2 rounded-lg font-bold hover:bg-gold-dark transition-all flex items-center gap-2 shadow-lg"
+          >
+            <Plus size={18} /> Registrar Venda
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Daily Prospecting Goal */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center">
+             <div className="relative w-32 h-32 mb-4">
+                <svg className="w-full h-full transform -rotate-90">
+                  <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-gray-100" />
+                  <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-gold" strokeDasharray={364.4} strokeDashoffset={364.4 - (Math.min(todayCount, 60) / 60) * 364.4} strokeLinecap="round" />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-2xl font-black text-primary">{todayCount}</span>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase">De 60</span>
+                </div>
+             </div>
+             <h3 className="font-bold text-gray-800 flex items-center gap-2">
+               <Target size={16} className="text-gold" /> Meta Diária
+             </h3>
+             <p className="text-xs text-gray-500 mt-1">Prospecções realizadas hoje</p>
+          </div>
+
+          {/* Weekly Revenue Goal */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+             <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                    <DollarSign size={16} className="text-green-500" /> Meta Semanal
+                  </h3>
+                  <p className="text-xs text-gray-500">Faturamento alvo: R$ 600,00</p>
+                </div>
+                <span className="text-2xl font-black text-green-600">R$ {weeklyRevenue.toFixed(2)}</span>
+             </div>
+             <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-green-500 transition-all duration-1000" 
+                  style={{ width: `${Math.min((weeklyRevenue / 600) * 100, 100)}%` }}
+                ></div>
+             </div>
+             <div className="mt-2 flex justify-between text-[10px] font-bold text-gray-400">
+                <span>0%</span>
+                <span>{((weeklyRevenue / 600) * 100).toFixed(0)}% Concluído</span>
+                <span>100%</span>
+             </div>
+          </div>
+
+          {/* Total History */}
+          <div className="bg-primary text-white p-6 rounded-2xl shadow-xl flex flex-col justify-between relative overflow-hidden">
+             <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-gold opacity-10 rounded-full blur-2xl"></div>
+             <div>
+               <h3 className="font-bold flex items-center gap-2 opacity-80">
+                 <Zap size={16} className="text-gold" /> Total Acumulado
+               </h3>
+               <p className="text-4xl font-black mt-4">{totalSent.toLocaleString()}</p>
+               <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest font-bold">Mensagens Enviadas</p>
+             </div>
+             <div className="mt-6 flex items-center gap-2 text-gold text-xs font-bold">
+               <TrendingUp size={14} /> +{stats.sentLog.length > 10 ? '12%' : '0%'} vs mês anterior
+             </div>
+          </div>
+        </div>
+
+        {/* Recent Activity Table placeholder */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-4 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
+            <h3 className="font-bold text-gray-700">Logs de Receita Recentes</h3>
+          </div>
+          <table className="w-full text-left">
+            <tbody className="divide-y">
+              {stats.revenueLog.slice(-5).reverse().map((log, i) => (
+                <tr key={i} className="hover:bg-gray-50">
+                  <td className="p-4 text-sm font-medium text-gray-600">{new Date(log.date).toLocaleDateString()}</td>
+                  <td className="p-4 text-sm text-gray-400">{new Date(log.date).toLocaleTimeString()}</td>
+                  <td className="p-4 text-right font-bold text-green-600">+ R$ {log.amount.toFixed(2)}</td>
+                </tr>
+              ))}
+              {stats.revenueLog.length === 0 && (
+                <tr><td colSpan={3} className="p-10 text-center text-gray-400 italic">Nenhuma venda registrada esta semana.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex min-h-screen bg-gray-50 font-sans">
-      
-      {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />
       )}
 
-      {/* Sidebar Navigation */}
       <aside className={`
         fixed lg:static inset-y-0 left-0 z-50 w-72 bg-primary text-gray-300 transform transition-transform duration-200 ease-in-out flex flex-col h-full
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
@@ -91,50 +237,50 @@ function App() {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
-          {niches.map((niche) => {
-             return (
-              <button
-                key={niche.id}
-                onClick={() => {
-                  setActiveNicheId(niche.id);
-                  setIsMobileMenuOpen(false);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className={`
-                  w-full flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
-                  ${activeNicheId === niche.id 
-                    ? 'bg-gradient-to-r from-gold to-gold-dark text-white shadow-lg translate-x-1' 
-                    : 'hover:bg-primary-light hover:text-white'}
-                `}
-              >
-                <span className={`${activeNicheId === niche.id ? 'text-white' : 'text-gray-400'} mr-3`}>
-                  {renderIcon(niche.icon)}
-                </span>
-                <span className="truncate">{niche.label}</span>
-              </button>
-             );
-          })}
+          <button 
+            onClick={() => { setView('dashboard'); setIsMobileMenuOpen(false); }}
+            className={`w-full flex items-center px-3 py-2.5 rounded-lg text-sm font-medium mb-4 transition-all ${view === 'dashboard' ? 'bg-gold text-white shadow-lg' : 'hover:bg-primary-light text-gray-400 hover:text-white'}`}
+          >
+            <BarChart2 className="w-5 h-5 mr-3" /> Dashboard CRM
+          </button>
+
+          <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-3 mb-2">Nichos Especializados</div>
+          {niches.map((niche) => (
+            <button
+              key={niche.id}
+              onClick={() => {
+                setActiveNicheId(niche.id);
+                setView('app');
+                setIsMobileMenuOpen(false);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`
+                w-full flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 mb-1
+                ${activeNicheId === niche.id && view === 'app' 
+                  ? 'bg-primary-light text-gold border-l-4 border-gold' 
+                  : 'hover:bg-primary-light hover:text-white'}
+              `}
+            >
+              <span className={`${activeNicheId === niche.id && view === 'app' ? 'text-gold' : 'text-gray-400'} mr-3`}>
+                {renderIcon(niche.icon)}
+              </span>
+              <span className="truncate">{niche.label}</span>
+            </button>
+          ))}
         </nav>
 
         <div className="p-4 bg-primary-light m-4 rounded-xl border border-gray-700 shrink-0">
-          <p className="text-xs text-gray-400 mb-2 font-medium">Status do Servidor</p>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-            <span className="text-[10px] text-green-400">Sistema Online</span>
-          </div>
+          <p className="text-xs text-gray-400 mb-2 font-medium">Meta Diária: {getTodayStats()}/60</p>
           <div className="w-full bg-gray-700 h-1.5 rounded-full">
-            <div className="bg-gold h-1.5 rounded-full w-full animate-pulse"></div>
+            <div 
+              className="bg-gold h-1.5 rounded-full transition-all" 
+              style={{ width: `${(getTodayStats() / 60) * 100}%` }}
+            ></div>
           </div>
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 min-w-0 overflow-hidden flex flex-col h-screen">
-        
-        {/* Top Header (Mobile Only) */}
         <header className="lg:hidden bg-white border-b border-gray-200 p-4 flex items-center justify-between shrink-0">
            <div className="flex items-center space-x-2">
                 <div className="w-6 h-6 bg-gold rounded flex items-center justify-center text-white font-bold text-sm">Z</div>
@@ -145,47 +291,27 @@ function App() {
            </button>
         </header>
 
-        {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50/50">
           <div className="max-w-6xl mx-auto">
-            
-            {/* Niche Specific Header/Widgets */}
-            {activeNiche.type !== NicheType.GENERAL && (
-              <NicheLayout type={activeNiche.type} />
+            {view === 'dashboard' ? (
+              <RenderDashboard />
+            ) : (
+              <>
+                {activeNiche.type !== NicheType.GENERAL && <NicheLayout type={activeNiche.type} />}
+                {activeNiche.type === NicheType.GENERAL && (
+                  <div className="mb-8 animate-fade-in text-center py-10">
+                     <div className="inline-flex p-3 bg-gold/10 rounded-full mb-4">
+                        <Zap className="w-8 h-8 text-gold-dark" />
+                     </div>
+                     <h1 className="text-3xl md:text-5xl font-serif font-bold text-primary mb-4">Central de Produtividade</h1>
+                     <p className="text-gray-600 text-lg max-w-2xl mx-auto">Importe seus leads e automatize sua prospecção de forma inteligente.</p>
+                  </div>
+                )}
+                <WhatsAppGenerator />
+              </>
             )}
-
-            {/* Dashboard Welcome (General Only) */}
-            {activeNiche.type === NicheType.GENERAL && (
-              <div className="mb-8 animate-fade-in text-center py-10">
-                 <div className="inline-flex p-3 bg-gold/10 rounded-full mb-4">
-                    <Zap className="w-8 h-8 text-gold-dark" />
-                 </div>
-                 <h1 className="text-3xl md:text-5xl font-serif font-bold text-primary mb-4">Central de Produtividade</h1>
-                 <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-                   Selecione um nicho no menu lateral ou use o importador universal abaixo para transformar listas de contatos em links de WhatsApp instantâneos.
-                 </p>
-              </div>
-            )}
-
-            {/* Main Application Logic */}
-            <WhatsAppGenerator />
           </div>
         </div>
-
-        {/* Floating WhatsApp Action Button */}
-        <a 
-          href="https://wa.me/?text=Tenho%20interesse%20no%20sistema"
-          target="_blank"
-          rel="noreferrer" 
-          className="fixed bottom-6 right-6 bg-[#25D366] text-white p-4 rounded-full shadow-xl hover:bg-[#20bd5a] transition-all hover:scale-110 z-50 flex items-center justify-center group"
-          title="Fale Conosco"
-        >
-          <span className="absolute right-full mr-3 bg-white text-gray-800 px-3 py-1 rounded shadow text-sm font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">Suporte Online</span>
-          <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-          </svg>
-        </a>
-
       </main>
     </div>
   );

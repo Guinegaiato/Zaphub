@@ -49,6 +49,11 @@
       ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
       ::-webkit-scrollbar-track { background: transparent; }
       .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+      .progress-ring__circle {
+        transition: stroke-dashoffset 0.35s;
+        transform: rotate(-90deg);
+        transform-origin: 50% 50%;
+      }
     </style>
 <script type="importmap">
 {
@@ -56,8 +61,8 @@
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "xlsx": "https://esm.sh/xlsx@^0.18.5"
+    "xlsx": "https://esm.sh/xlsx@^0.18.5",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
   }
 }
 </script>
@@ -75,34 +80,6 @@
         "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"
       ];
 
-      const DDD_MAP = {
-        11: 'SP - São Paulo (Capital)', 12: 'SP - Vale do Paraíba', 13: 'SP - Baixada Santista', 14: 'SP - Bauru/Marília', 15: 'SP - Sorocaba', 16: 'SP - Ribeirão Preto', 17: 'SP - Rio Preto', 18: 'SP - Pres. Prudente', 19: 'SP - Campinas',
-        21: 'RJ - Rio de Janeiro', 22: 'RJ - Campos', 24: 'RJ - Volta Redonda',
-        27: 'ES - Vitória', 28: 'ES - Cachoeiro',
-        31: 'MG - Belo Horizonte', 32: 'MG - Juiz de Fora', 33: 'MG - Gov. Valadares', 34: 'MG - Uberlândia', 35: 'MG - Poços de Caldas', 37: 'MG - Divinópolis', 38: 'MG - Montes Claros',
-        41: 'PR - Curitiba', 42: 'PR - Ponta Grossa', 43: 'PR - Londrina', 44: 'PR - Maringá', 45: 'PR - Foz do Iguaçu', 46: 'PR - Francisco Beltrão',
-        47: 'SC - Joinville', 48: 'SC - Florianópolis', 49: 'SC - Chapecó',
-        51: 'RS - Porto Alegre', 53: 'RS - Pelotas', 54: 'RS - Caxias do Sul', 55: 'RS - Santa Maria',
-        61: 'DF - Brasília', 62: 'GO - Goiânia', 64: 'GO - Rio Verde',
-        63: 'TO - Tocantins',
-        65: 'MT - Cuiabá', 66: 'MT - Rondonópolis',
-        67: 'MS - Campo Grande',
-        68: 'AC - Acre', 69: 'RO - Rondônia',
-        71: 'BA - Salvador', 73: 'BA - Ilhéus', 74: 'BA - Juazeiro', 75: 'BA - Feira de Santana', 77: 'BA - Barreiras',
-        79: 'SE - Sergipe',
-        81: 'PE - Recife', 87: 'PE - Petrolina',
-        82: 'AL - Alagoas',
-        83: 'PB - Paraíba',
-        84: 'RN - Rio Grande do Norte',
-        85: 'CE - Fortaleza', 88: 'CE - Juazeiro do Norte',
-        86: 'PI - Teresina', 89: 'PI - Picos',
-        91: 'PA - Belém', 93: 'PA - Santarém', 94: 'PA - Marabá',
-        92: 'AM - Manaus', 97: 'AM - Coari',
-        95: 'RR - Roraima',
-        96: 'AP - Amapá',
-        98: 'MA - São Luís', 99: 'MA - Imperatriz'
-      };
-
       const NICHES = [
         { id: 'lawyer', label: 'Advocacia (Criminal/Família)', icon: 'scale' },
         { id: 'accounting', label: 'Contadores para MEIs', icon: 'calculator' },
@@ -113,33 +90,9 @@
         { id: 'franchise', label: 'Consultor de Franquias', icon: 'trending-up' },
         { id: 'realestate', label: 'Imobiliária Alto Padrão', icon: 'home' },
         { id: 'insurance', label: 'Corretor Seguros de Vida', icon: 'shield-check' },
-        { id: 'architect', label: 'Arquiteto de Interiores', icon: 'pen-tool' },
-        { id: 'design_com', label: 'Designer Comercial', icon: 'briefcase' },
-        { id: 'safety', label: 'Eng. Segurança Trabalho', icon: 'hard-hat' },
-        { id: 'pest', label: 'Empresas de Dedetização', icon: 'bug' },
-        { id: 'furniture', label: 'Móveis Planejados', icon: 'sofa' },
-        { id: 'curtains', label: 'Persianas Automatizadas', icon: 'blinds' },
-        { id: 'cctv', label: 'Empresas de CFTV', icon: 'video' },
-        { id: 'solar', label: 'Placas Solares', icon: 'sun' },
-        { id: 'music', label: 'Escola de Música', icon: 'music' },
-        { id: 'language', label: 'Escola de Idiomas', icon: 'languages' },
-        { id: 'tutoring', label: 'Reforço para Concursos', icon: 'book-open' },
-        { id: 'organizer', label: 'Personal Organizer', icon: 'layers' },
-        { id: 'physio', label: 'Fisioterapia Domiciliar', icon: 'activity' },
-        { id: 'acu', label: 'Acupuntura Estética', icon: 'sparkles' },
-        { id: 'tattoo', label: 'Estúdio de Tatuagem', icon: 'palette' },
-        { id: 'dispatcher', label: 'Despachante', icon: 'file-text' },
-        { id: 'dentist', label: 'Clínicas Odontológicas', icon: 'smile' },
-        { id: 'food', label: 'Lanchonetes', icon: 'utensils' },
-        { id: 'aesthetics', label: 'Clínicas de Estética', icon: 'sparkles' },
-        { id: 'derma', label: 'Dermatologia', icon: 'activity' },
-        { id: 'laser', label: 'Depilação a Laser', icon: 'zap' },
-        { id: 'facilities', label: 'Manutenção Predial', icon: 'hammer' },
-        { id: 'logistics', label: 'Transportadoras', icon: 'truck' },
-        { id: 'trainer', label: 'Personal Trainer', icon: 'dumbbell' },
+        { id: 'architect', label: 'Arquiteto de Interiores', icon: 'pen-tool' }
       ];
 
-      // --- ICONS (LUCIDE WRAPPER) ---
       const Icon = ({ name, size = 18, className = "" }) => {
         if (!window.lucide || !window.lucide.icons) {
             return <span className={`inline-block bg-gray-400 rounded-sm ${className}`} style={{ width: size, height: size }}></span>;
@@ -155,7 +108,6 @@
         });
       };
 
-      // --- HELPERS ---
       const sanitizePhone = (phone) => {
         if (!phone) return '';
         let str = String(phone).replace(/\D/g, ''); 
@@ -172,7 +124,7 @@
         const [activeView, setActiveView] = useState('home');
         const [activeNiche, setActiveNiche] = useState(null);
         
-        // Data State
+        // Leads State
         const [fileData, setFileData] = useState([]);
         const [fileName, setFileName] = useState('');
         const [headers, setHeaders] = useState([]);
@@ -182,33 +134,72 @@
         const [leads, setLeads] = useState([]);
         const [message, setMessage] = useState("Olá! Vi seu contato e gostaria de falar sobre nossos serviços.");
         
-        // History & CRM
+        // Persistent Data State
         const [history, setHistory] = useState([]);
-        const [selectedLead, setSelectedLead] = useState(null);
-
-        // Prospecting Map State
         const [prospectingData, setProspectingData] = useState({});
+        const [stats, setStats] = useState({
+          sentLog: [], // Array of ISO strings
+          revenueLog: [] // Array of { amount, date }
+        });
 
-        // LOAD DATA ON MOUNT
+        // Load all data on mount
         useEffect(() => {
-          const savedHistory = localStorage.getItem('ZAPHUB_HISTORY_V2');
-          if (savedHistory) setHistory(JSON.parse(savedHistory));
+          const h = localStorage.getItem('ZAPHUB_HISTORY_V3');
+          if (h) setHistory(JSON.parse(h));
 
-          const savedProspecting = localStorage.getItem('ZAPHUB_PROSPECTING_V1');
-          if (savedProspecting) setProspectingData(JSON.parse(savedProspecting));
+          const p = localStorage.getItem('ZAPHUB_PROSPECTING_V2');
+          if (p) setProspectingData(JSON.parse(p));
           else {
-            // Init with empty states
             const initial = {};
             STATES.forEach(s => initial[s] = []);
             setProspectingData(initial);
           }
+
+          const s = localStorage.getItem('ZAPHUB_STATS_V2');
+          if (s) setStats(JSON.parse(s));
         }, []);
 
-        const saveProspecting = (newData) => {
-          setProspectingData(newData);
-          localStorage.setItem('ZAPHUB_PROSPECTING_V1', JSON.stringify(newData));
+        // Sync to LocalStorage
+        useEffect(() => {
+          localStorage.setItem('ZAPHUB_HISTORY_V3', JSON.stringify(history));
+          localStorage.setItem('ZAPHUB_PROSPECTING_V2', JSON.stringify(prospectingData));
+          localStorage.setItem('ZAPHUB_STATS_V2', JSON.stringify(stats));
+        }, [history, prospectingData, stats]);
+
+        // Helpers for Tracking
+        const trackProspection = (lead) => {
+          const now = new Date().toISOString();
+          setStats(prev => ({
+            ...prev,
+            sentLog: [...prev.sentLog, now]
+          }));
+          setHistory(prev => [{ name: lead.name, phone: lead.phone, dateStr: new Date().toLocaleString() }, ...prev].slice(0, 100));
         };
 
+        const addRevenue = (amount) => {
+          const now = new Date().toISOString();
+          setStats(prev => ({
+            ...prev,
+            revenueLog: [...prev.revenueLog, { amount: Number(amount), date: now }]
+          }));
+        };
+
+        // Calculations for Dashboard
+        const getTodayCount = () => {
+          const today = new Date().toISOString().split('T')[0];
+          return stats.sentLog.filter(date => date.startsWith(today)).length;
+        };
+
+        const getWeeklyRevenue = () => {
+          const now = new Date();
+          const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
+          startOfWeek.setHours(0, 0, 0, 0);
+          return stats.revenueLog
+            .filter(item => new Date(item.date) >= startOfWeek)
+            .reduce((acc, curr) => acc + curr.amount, 0);
+        };
+
+        // Expansion Map Handlers
         const addCityToState = (state, cityName, status) => {
           const currentStateCities = prospectingData[state] || [];
           if (currentStateCities.length >= 35) {
@@ -216,314 +207,194 @@
             return;
           }
           const newCity = { name: cityName, status, id: Date.now() };
-          const newData = { ...prospectingData, [state]: [...currentStateCities, newCity] };
-          saveProspecting(newData);
+          setProspectingData({ ...prospectingData, [state]: [...currentStateCities, newCity] });
         };
 
         const updateCityStatus = (state, cityId, newStatus) => {
-          const newData = {
+          setProspectingData({
             ...prospectingData,
             [state]: prospectingData[state].map(c => c.id === cityId ? { ...c, status: newStatus } : c)
-          };
-          saveProspecting(newData);
+          });
         };
 
         const removeCity = (state, cityId) => {
-          const newData = {
+          setProspectingData({
             ...prospectingData,
             [state]: prospectingData[state].filter(c => c.id !== cityId)
-          };
-          saveProspecting(newData);
+          });
         };
 
-        // --- UPLOAD LOGIC ---
+        // Lead Processing Handlers
         const handleFileUpload = (e) => {
           const file = e.target.files[0];
           if (!file) return;
           setFileName(file.name);
-          
           const reader = new FileReader();
           reader.onload = (evt) => {
             const bstr = evt.target.result;
             const wb = XLSX.read(bstr, { type: 'binary' });
             const ws = wb.Sheets[wb.SheetNames[0]];
             const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-            
-            let startIndex = 0;
-            for(let i=0; i<Math.min(data.length, 20); i++) {
-                const rowStr = JSON.stringify(data[i]).toLowerCase();
-                if(rowStr.includes('nome') || rowStr.includes('cliente') || rowStr.includes('tel')) {
-                    startIndex = i;
-                    break;
-                }
-            }
-            const cleanData = data.slice(startIndex);
-            if (cleanData.length > 0) {
-              setFileData(cleanData);
-              setHeaders(cleanData[0].map((h, i) => ({ idx: i, val: h || `Coluna ${i+1}` })));
-              setMapStep(true);
-              setActiveView('home');
-            }
+            setFileData(data);
+            setHeaders(data[0].map((h, i) => ({ idx: i, val: h || `Coluna ${i+1}` })));
+            setMapStep(true);
+            setActiveView('home');
           };
           reader.readAsBinaryString(file);
         };
 
         const processLeads = () => {
-          if (colName === -1 || colPhone === -1) {
-            alert("Selecione as colunas.");
-            return;
-          }
-          const processed = [];
-          for (let i = 1; i < fileData.length; i++) {
-             const row = fileData[i];
-             if (!row) continue;
+          if (colName === -1 || colPhone === -1) return alert("Selecione as colunas.");
+          const processed = fileData.slice(1).map((row, i) => {
              const cleanPhone = sanitizePhone(row[colPhone]);
              const isValid = cleanPhone.length >= 10;
-             processed.push({
+             return {
                id: i,
                name: row[colName] || 'Sem Nome',
                phone: cleanPhone,
                status: isValid ? 'valid' : 'invalid',
                link: isValid ? generateLink(cleanPhone, message) : '#',
                sent: history.some(h => h.phone === cleanPhone)
-             });
-          }
+             };
+          }).filter(l => l.phone !== '');
           setLeads(processed);
           setMapStep(false);
           setActiveView('list');
         };
 
-        // --- RENDERERS ---
+        // --- VIEWS ---
 
-        const RenderSidebar = () => (
-          <aside className="w-64 bg-primary text-gray-300 flex flex-col h-screen overflow-y-auto shrink-0 border-r border-gray-800">
-            <div className="p-6">
-              <h1 className="text-2xl font-serif font-bold text-white flex items-center">
-                <span className="text-gold mr-2">⚡</span> ZapHub
-              </h1>
-            </div>
-            <nav className="flex-1 px-3 space-y-1">
-              <button onClick={() => { setActiveView('home'); setActiveNiche(null); }} className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors ${activeView === 'home' ? 'bg-gold text-primary font-bold' : 'hover:bg-gray-800'}`}>
-                <Icon name="upload" className="mr-3"/> Início
-              </button>
-              
-              <button onClick={() => { setActiveView('map'); setActiveNiche(null); }} className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors ${activeView === 'map' ? 'bg-gold text-primary font-bold' : 'hover:bg-gray-800'}`}>
-                <Icon name="map" className="mr-3"/> Mapa de Expansão
-              </button>
-
-              <button onClick={() => { setActiveView('reports'); setActiveNiche(null); }} className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors ${activeView === 'reports' ? 'bg-gold text-primary font-bold' : 'hover:bg-gray-800'}`}>
-                <Icon name="bar-chart-2" className="mr-3"/> Dashboard CRM
-              </button>
-
-              <button onClick={() => { setActiveView('history'); setActiveNiche(null); }} className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors ${activeView === 'history' ? 'bg-gold text-primary font-bold' : 'hover:bg-gray-800'}`}>
-                <Icon name="history" className="mr-3"/> Histórico
-              </button>
-
-              <div className="mt-6 mb-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nichos</div>
-              {NICHES.slice(0, 10).map(niche => (
-                <button key={niche.id} onClick={() => { setActiveNiche(niche); setActiveView('niche'); }} className={`w-full flex items-center px-3 py-2 rounded-lg text-sm transition-colors ${activeNiche?.id === niche.id ? 'bg-gray-800 text-white' : 'hover:bg-gray-800'}`}>
-                  <Icon name={niche.icon} className="mr-3 opacity-70" size={16}/> {niche.label}
-                </button>
-              ))}
-            </nav>
-          </aside>
-        );
-
-        const RenderProspectingMap = () => {
-          const [selectedState, setSelectedState] = useState(null);
-          const [newCityName, setNewCityName] = useState('');
-          const [newCityStatus, setNewCityStatus] = useState('pendente');
+        const RenderDashboard = () => {
+          const today = getTodayCount();
+          const weekly = getWeeklyRevenue();
+          const total = stats.sentLog.length;
+          const radius = 52;
+          const circumference = 2 * Math.PI * radius;
+          const offset = circumference - (Math.min(today, 60) / 60) * circumference;
 
           return (
-            <div className="p-8 animate-fade-in w-full max-w-7xl mx-auto pb-20">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-3xl font-serif font-bold text-primary flex items-center">
-                  <Icon name="map" className="mr-3 text-gold" size={32}/> Mapa de Expansão Nacional
-                </h2>
-                <div className="bg-white px-4 py-2 rounded-full shadow text-sm font-bold border border-gray-100">
-                  <span className="text-green-500">● Completado</span> | <span className="text-yellow-500">● Pendente</span> | <span className="text-blue-500">● Em Breve</span>
+            <div className="p-8 animate-fade-in max-w-6xl mx-auto pb-20">
+              <div className="flex justify-between items-end mb-8">
+                <div>
+                  <h2 className="text-3xl font-serif font-bold text-primary">Dashboard CRM</h2>
+                  <p className="text-gray-500">Gestão de metas e faturamento semanal.</p>
                 </div>
+                <button 
+                  onClick={() => {
+                    const val = prompt("Valor da Venda (R$):");
+                    if(val) addRevenue(val);
+                  }}
+                  className="bg-gold text-white px-6 py-2 rounded-lg font-bold hover:bg-gold-dark shadow-lg flex items-center gap-2"
+                >
+                  <Icon name="plus" /> Registrar Receita
+                </button>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-9 gap-3">
-                {STATES.map(state => {
-                  const cities = prospectingData[state] || [];
-                  const completedCount = cities.filter(c => c.status === 'completado').length;
-                  
-                  return (
-                    <div 
-                      key={state} 
-                      onClick={() => setSelectedState(state)}
-                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all hover:scale-105 shadow-sm flex flex-col items-center justify-center ${selectedState === state ? 'border-gold bg-white' : 'border-gray-200 bg-white hover:border-gold/50'}`}
-                    >
-                      <span className="text-2xl font-black text-primary">{state}</span>
-                      <div className="mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
-                        {completedCount}/{cities.length} Cidades
-                      </div>
-                      <div className="mt-2 w-full h-1 bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gold transition-all" 
-                          style={{ width: `${cities.length > 0 ? (completedCount / cities.length) * 100 : 0}%` }}
-                        ></div>
-                      </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                {/* Daily Goal */}
+                <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center">
+                  <div className="relative w-40 h-40 mb-4">
+                    <svg className="w-full h-full transform -rotate-90">
+                      <circle cx="80" cy="80" r={radius} stroke="#f1f5f9" strokeWidth="12" fill="transparent" />
+                      <circle 
+                        cx="80" cy="80" r={radius} stroke="#d4af37" strokeWidth="12" fill="transparent" 
+                        strokeDasharray={circumference} 
+                        strokeDashoffset={offset} 
+                        strokeLinecap="round"
+                        className="progress-ring__circle"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-3xl font-black text-primary">{today}</span>
+                      <span className="text-[10px] text-gray-400 font-bold uppercase">De 60 Msgs</span>
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                  <h3 className="font-bold text-gray-700">Meta Diária</h3>
+                  <p className="text-xs text-gray-400 mt-1">Limite recomendado de segurança</p>
+                </div>
 
-              {selectedState && (
-                <div className="mt-10 bg-white p-8 rounded-2xl shadow-xl border border-gold/20 animate-fade-in">
-                  <div className="flex justify-between items-center mb-8 pb-4 border-b">
+                {/* Weekly Goal */}
+                <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                  <div className="flex justify-between items-start mb-6">
                     <div>
-                      <h3 className="text-2xl font-bold text-primary">Prospecção: {selectedState}</h3>
-                      <p className="text-gray-500 text-sm">Gerencie até 35 cidades neste estado. Atualmente: {prospectingData[selectedState]?.length || 0}/35</p>
+                      <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                        <Icon name="dollar-sign" className="text-green-500" /> Meta Semanal
+                      </h3>
+                      <p className="text-xs text-gray-400">Objetivo: R$ 600,00</p>
                     </div>
-                    <button onClick={() => setSelectedState(null)} className="text-gray-400 hover:text-primary"><Icon name="x" size={24}/></button>
+                    <span className="text-2xl font-black text-green-600">R$ {weekly.toFixed(2)}</span>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {/* Add Form */}
-                    <div className="bg-gray-50 p-6 rounded-xl border border-dashed border-gray-300">
-                      <h4 className="font-bold text-gray-700 mb-4 flex items-center">
-                        <Icon name="plus-circle" className="mr-2 text-gold" size={18}/> Adicionar Nova Cidade
-                      </h4>
-                      <div className="space-y-4">
-                        <input 
-                          placeholder="Nome da Cidade" 
-                          className="w-full p-3 rounded-lg border focus:ring-2 focus:ring-gold outline-none" 
-                          value={newCityName}
-                          onChange={e => setNewCityName(e.target.value)}
-                        />
-                        <select 
-                          className="w-full p-3 rounded-lg border outline-none"
-                          value={newCityStatus}
-                          onChange={e => setNewCityStatus(e.target.value)}
-                        >
-                          <option value="pendente">Pendente</option>
-                          <option value="completado">Completado</option>
-                          <option value="em_breve">Em Breve</option>
-                        </select>
-                        <button 
-                          onClick={() => {
-                            if (!newCityName.trim()) return;
-                            addCityToState(selectedState, newCityName, newCityStatus);
-                            setNewCityName('');
-                          }}
-                          className="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-gray-800 transition-colors"
-                        >
-                          Salvar Cidade
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Cities List */}
-                    <div className="md:col-span-2">
-                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2">
-                          {(prospectingData[selectedState] || []).map(city => (
-                            <div key={city.id} className="bg-white p-4 rounded-lg border shadow-sm flex items-center justify-between group hover:border-gold/50 transition-colors">
-                               <div className="flex items-center">
-                                  <span className={`status-dot ${city.status === 'completado' ? 'bg-green-500' : city.status === 'pendente' ? 'bg-yellow-500' : 'bg-blue-500'}`}></span>
-                                  <span className="font-medium text-gray-800">{city.name}</span>
-                               </div>
-                               <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button 
-                                    onClick={() => {
-                                      const cycle = { pendente: 'completado', completado: 'em_breve', em_breve: 'pendente' };
-                                      updateCityStatus(selectedState, city.id, cycle[city.status]);
-                                    }}
-                                    className="p-1 hover:text-gold" title="Alternar Status"
-                                  >
-                                    <Icon name="refresh-cw" size={14}/>
-                                  </button>
-                                  <button onClick={() => removeCity(selectedState, city.id)} className="p-1 hover:text-red-500" title="Excluir">
-                                    <Icon name="trash-2" size={14}/>
-                                  </button>
-                               </div>
-                            </div>
-                          ))}
-                          {(prospectingData[selectedState] || []).length === 0 && (
-                            <div className="col-span-2 py-10 text-center text-gray-400">
-                              <Icon name="info" className="mx-auto mb-2 opacity-50" size={32}/>
-                              Nenhuma cidade prospectada em {selectedState}.
-                            </div>
-                          )}
-                       </div>
-                    </div>
+                  <div className="w-full bg-gray-100 h-4 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-green-500 transition-all duration-1000" 
+                      style={{ width: `${Math.min((weekly / 600) * 100, 100)}%` }}
+                    ></div>
+                  </div>
+                  <div className="mt-3 flex justify-between text-[10px] font-bold text-gray-400">
+                    <span>{Math.round((weekly / 600) * 100)}% Concluído</span>
+                    <span>R$ 600</span>
                   </div>
                 </div>
-              )}
+
+                {/* Total Counter */}
+                <div className="bg-primary text-white p-8 rounded-2xl shadow-xl flex flex-col justify-between relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gold opacity-10 rounded-full blur-3xl -mr-16 -mt-16"></div>
+                  <div>
+                    <h3 className="font-bold opacity-70 flex items-center gap-2">
+                      <Icon name="zap" className="text-gold" /> Total Enviado
+                    </h3>
+                    <p className="text-5xl font-black mt-4 tracking-tighter">{total.toLocaleString()}</p>
+                    <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest font-bold">Prospecções Históricas</p>
+                  </div>
+                  <div className="mt-6 flex items-center gap-2 text-gold text-xs font-bold">
+                    <Icon name="trending-up" size={14} /> Sistema Ativo
+                  </div>
+                </div>
+              </div>
+
+              {/* Logs */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-4 border-b border-gray-50 bg-gray-50/50">
+                  <h3 className="font-bold text-gray-700">Vendas Recentes</h3>
+                </div>
+                <table className="w-full text-left">
+                  <tbody className="divide-y">
+                    {stats.revenueLog.slice(-5).reverse().map((log, i) => (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="p-4 text-sm font-medium text-gray-600">{new Date(log.date).toLocaleDateString()}</td>
+                        <td className="p-4 text-sm text-gray-400">{new Date(log.date).toLocaleTimeString()}</td>
+                        <td className="p-4 text-right font-bold text-green-600">+ R$ {log.amount.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                    {stats.revenueLog.length === 0 && (
+                      <tr><td colSpan="3" className="p-10 text-center text-gray-400 italic">Nenhuma venda registrada ainda.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           );
         };
-
-        const RenderHome = () => (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50 h-full">
-            <div className="max-w-xl w-full text-center">
-               <div className="inline-block p-4 bg-primary rounded-2xl shadow-2xl mb-6">
-                 <Icon name="zap" className="text-gold w-12 h-12" />
-               </div>
-               <h1 className="text-4xl font-serif font-bold text-primary mb-2 tracking-tight">ZapHub Pro</h1>
-               <p className="text-gray-600 mb-8 text-lg">Central de automação de WhatsApp para múltiplos nichos.</p>
-               
-               <div className="bg-white p-10 rounded-2xl shadow-xl border-2 border-dashed border-gray-300 hover:border-gold transition-all relative cursor-pointer group">
-                  <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={handleFileUpload} accept=".csv, .xlsx, .xls" />
-                  <div className="group-hover:scale-105 transition-transform duration-300">
-                    <Icon name="file-spreadsheet" className="w-16 h-16 text-gray-300 mx-auto mb-4 group-hover:text-gold"/>
-                    <h3 className="text-xl font-bold text-gray-700">Importar Lista de Leads</h3>
-                    <p className="text-sm text-gray-400 mt-2">Arraste ou clique para selecionar (.xlsx / .csv)</p>
-                  </div>
-               </div>
-            </div>
-          </div>
-        );
-
-        const RenderMapping = () => (
-           <div className="p-8 flex justify-center items-start pt-20 h-full bg-gray-50">
-             <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-2xl w-full border-t-8 border-gold">
-                <h2 className="text-2xl font-bold mb-2 flex items-center text-primary">
-                  <Icon name="table" className="mr-2"/> Mapeamento de Dados
-                </h2>
-                <p className="text-gray-500 mb-6 italic">Arquivo carregado: {fileName}</p>
-                <div className="grid grid-cols-2 gap-6 mb-8">
-                  <div>
-                    <label className="block font-bold text-gray-700 mb-2">Coluna de NOME</label>
-                    <select className="w-full p-3 border rounded-lg" value={colName} onChange={e => setColName(Number(e.target.value))}>
-                       <option value="-1">Selecione...</option>
-                       {headers.map(h => <option key={h.idx} value={h.idx}>{h.val}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block font-bold text-gray-700 mb-2">Coluna de TELEFONE</label>
-                    <select className="w-full p-3 border rounded-lg" value={colPhone} onChange={e => setColPhone(Number(e.target.value))}>
-                       <option value="-1">Selecione...</option>
-                       {headers.map(h => <option key={h.idx} value={h.idx}>{h.val}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <button onClick={processLeads} className="w-full bg-primary text-white py-4 rounded-xl font-bold hover:bg-gray-800 shadow-lg flex justify-center items-center gap-2">
-                   Iniciar Processamento <Icon name="arrow-right" size={20}/>
-                </button>
-             </div>
-           </div>
-        );
 
         const RenderList = () => (
           <div className="p-8 max-w-7xl mx-auto h-full flex flex-col pb-20">
              <div className="flex justify-between items-end mb-6">
                 <div>
-                  <h2 className="text-3xl font-serif font-bold text-primary">{activeNiche?.label || 'Lista de Envio'}</h2>
-                  <p className="text-gray-500">{leads.filter(l => l.status === 'valid').length} contatos prontos.</p>
+                  <h2 className="text-3xl font-serif font-bold text-primary">{activeNiche?.label || 'Lista de Leads'}</h2>
+                  <p className="text-gray-500">{leads.filter(l => l.status === 'valid').length} contatos válidos encontrados.</p>
                 </div>
-                <button onClick={() => { 
-                  const txt = leads.filter(l => l.status === 'valid').map(l => `${l.name}: ${l.link}`).join('\n');
-                  navigator.clipboard.writeText(txt);
-                  alert("Copiado!");
-                }} className="px-6 py-2 bg-white border border-gold text-gold-dark rounded-full font-bold hover:bg-gold hover:text-white transition-all">Copiar Todos os Links</button>
+                <div className="flex gap-2">
+                  <button onClick={() => { 
+                    const txt = leads.filter(l => l.status === 'valid').map(l => `${l.name}: ${l.link}`).join('\n');
+                    navigator.clipboard.writeText(txt);
+                    alert("Todos os links copiados!");
+                  }} className="px-6 py-2 bg-white border border-gold text-gold-dark rounded-full font-bold hover:bg-gold hover:text-white transition-all">Copiar Links</button>
+                </div>
              </div>
              
              <div className="bg-white p-4 rounded-xl shadow border mb-6 flex items-center gap-4">
                 <Icon name="message-square" className="text-gold" />
-                <input className="flex-1 bg-transparent border-none outline-none font-medium" value={message} onChange={e => setMessage(e.target.value)} />
+                <input className="flex-1 bg-transparent border-none outline-none font-medium" placeholder="Mensagem personalizada..." value={message} onChange={e => setMessage(e.target.value)} />
              </div>
 
              <div className="flex-1 bg-white rounded-2xl shadow-sm overflow-hidden border">
@@ -531,8 +402,8 @@
                   <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0">
                       <tr>
-                        <th className="p-4">Status</th>
-                        <th className="p-4">Nome</th>
+                        <th className="p-4">Status CRM</th>
+                        <th className="p-4">Nome do Lead</th>
                         <th className="p-4">WhatsApp</th>
                         <th className="p-4 text-right">Ação</th>
                       </tr>
@@ -541,12 +412,21 @@
                       {leads.map(lead => (
                         <tr key={lead.id} className={`hover:bg-gray-50 ${lead.sent ? 'bg-green-50/30' : ''}`}>
                           <td className="p-4">
-                            {lead.sent ? <span className="text-green-500 font-bold text-xs uppercase">Enviado</span> : <span className="text-gray-300 font-bold text-xs uppercase">Pendente</span>}
+                            {lead.sent ? <span className="text-green-500 font-bold text-xs uppercase flex items-center"><Icon name="check" size={12} className="mr-1"/> Contatado</span> : <span className="text-gray-300 font-bold text-xs uppercase">Aguardando</span>}
                           </td>
-                          <td className="p-4 font-bold">{lead.name}</td>
-                          <td className="p-4 font-mono text-sm">{lead.phone}</td>
+                          <td className="p-4 font-bold text-gray-700">{lead.name}</td>
+                          <td className="p-4 font-mono text-sm text-gray-500">{lead.phone}</td>
                           <td className="p-4 text-right">
-                            <button onClick={() => { window.open(lead.link, '_blank'); setLeads(prev => prev.map(l => l.id === lead.id ? {...l, sent: true} : l)); }} className="bg-[#25D366] text-white px-5 py-2 rounded-full text-xs font-bold shadow hover:scale-105 transition-all">Enviar</button>
+                            <button 
+                              onClick={() => { 
+                                window.open(lead.link, '_blank'); 
+                                setLeads(prev => prev.map(l => l.id === lead.id ? {...l, sent: true} : l));
+                                trackProspection(lead);
+                              }} 
+                              className="bg-[#25D366] text-white px-5 py-2 rounded-full text-xs font-bold shadow hover:scale-105 transition-all flex items-center gap-2 ml-auto"
+                            >
+                              <Icon name="send" size={14}/> Enviar
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -557,36 +437,172 @@
           </div>
         );
 
-        const RenderHistory = () => (
-          <div className="p-8 max-w-6xl mx-auto pb-20">
-             <h2 className="text-3xl font-serif font-bold text-primary mb-6">Histórico de Envios</h2>
-             <div className="bg-white rounded-xl shadow overflow-hidden border">
-                <table className="w-full text-left">
-                  <thead className="bg-gray-50 text-gray-400 text-xs uppercase">
-                    <tr><th className="p-4">Contato</th><th className="p-4">Data</th><th className="p-4">Status CRM</th></tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {history.map((h, i) => (
-                      <tr key={i} className="hover:bg-gray-50"><td className="p-4 font-bold">{h.name}</td><td className="p-4 text-sm text-gray-500">{h.dateStr}</td><td className="p-4"><span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold uppercase">Enviado</span></td></tr>
-                    ))}
-                    {history.length === 0 && <tr><td colSpan="3" className="p-10 text-center text-gray-400 italic">Nenhum envio registrado.</td></tr>}
-                  </tbody>
-                </table>
-             </div>
-          </div>
+        const RenderProspectingMap = () => {
+          const [selectedState, setSelectedState] = useState(null);
+          const [newCityName, setNewCityName] = useState('');
+          const [newCityStatus, setNewCityStatus] = useState('pendente');
+
+          return (
+            <div className="p-8 animate-fade-in max-w-7xl mx-auto pb-20">
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-3xl font-serif font-bold text-primary flex items-center">
+                  <Icon name="map" className="mr-3 text-gold" size={32}/> Mapa de Expansão
+                </h2>
+                <div className="bg-white px-4 py-2 rounded-full shadow text-sm font-bold border border-gray-100 flex gap-4">
+                  <span className="text-green-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> Completado</span>
+                  <span className="text-yellow-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500"></span> Pendente</span>
+                  <span className="text-blue-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500"></span> Em Breve</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-9 gap-3">
+                {STATES.map(state => {
+                  const cities = prospectingData[state] || [];
+                  const completed = cities.filter(c => c.status === 'completado').length;
+                  return (
+                    <div 
+                      key={state} onClick={() => setSelectedState(state)}
+                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all hover:scale-105 shadow-sm flex flex-col items-center justify-center ${selectedState === state ? 'border-gold bg-white' : 'border-gray-200 bg-white'}`}
+                    >
+                      <span className="text-2xl font-black text-primary">{state}</span>
+                      <div className="mt-1 text-[10px] font-bold text-gray-400 uppercase">{completed}/{cities.length} Cidades</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {selectedState && (
+                <div className="mt-10 bg-white p-8 rounded-2xl shadow-xl border border-gold/20 animate-fade-in">
+                  <div className="flex justify-between items-center mb-8 pb-4 border-b">
+                    <div>
+                      <h3 className="text-2xl font-bold text-primary">Estado: {selectedState}</h3>
+                      <p className="text-gray-500 text-sm">Cidades prospectadas: {prospectingData[selectedState]?.length || 0}/35</p>
+                    </div>
+                    <button onClick={() => setSelectedState(null)} className="p-2 hover:bg-gray-100 rounded-full"><Icon name="x" size={24}/></button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div className="bg-gray-50 p-6 rounded-xl border border-dashed border-gray-300">
+                      <h4 className="font-bold text-gray-700 mb-4">Adicionar Cidade</h4>
+                      <input placeholder="Nome" className="w-full p-3 rounded-lg border mb-3" value={newCityName} onChange={e => setNewCityName(e.target.value)} />
+                      <select className="w-full p-3 rounded-lg border mb-3" value={newCityStatus} onChange={e => setNewCityStatus(e.target.value)}>
+                        <option value="pendente">Pendente</option>
+                        <option value="completado">Completado</option>
+                        <option value="em_breve">Em Breve</option>
+                      </select>
+                      <button onClick={() => { if(!newCityName) return; addCityToState(selectedState, newCityName, newCityStatus); setNewCityName(''); }} className="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-gray-800">Salvar</button>
+                    </div>
+                    <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto">
+                      {(prospectingData[selectedState] || []).map(city => (
+                        <div key={city.id} className="bg-white p-4 rounded-lg border shadow-sm flex items-center justify-between">
+                           <div className="flex items-center">
+                              <span className={`status-dot ${city.status === 'completado' ? 'bg-green-500' : city.status === 'pendente' ? 'bg-yellow-500' : 'bg-blue-500'}`}></span>
+                              <span className="font-medium">{city.name}</span>
+                           </div>
+                           <div className="flex gap-2">
+                              <button onClick={() => removeCity(selectedState, city.id)} className="text-red-400 hover:text-red-600"><Icon name="trash-2" size={14}/></button>
+                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        const RenderSidebar = () => (
+          <aside className="w-64 bg-primary text-gray-300 flex flex-col h-screen overflow-y-auto shrink-0 border-r border-gray-800 shadow-2xl z-20">
+            <div className="p-6 border-b border-gray-800">
+              <h1 className="text-2xl font-serif font-bold text-white flex items-center">
+                <span className="text-gold mr-2">⚡</span> ZapHub
+              </h1>
+            </div>
+            <nav className="flex-1 px-3 py-4 space-y-1">
+              <button onClick={() => { setActiveView('home'); setActiveNiche(null); }} className={`w-full flex items-center px-3 py-2.5 rounded-lg transition-all ${activeView === 'home' ? 'bg-gold text-primary font-bold shadow-lg' : 'hover:bg-gray-800'}`}>
+                <Icon name="upload" className="mr-3"/> Início / Upload
+              </button>
+              
+              <button onClick={() => { setActiveView('reports'); setActiveNiche(null); }} className={`w-full flex items-center px-3 py-2.5 rounded-lg transition-all ${activeView === 'reports' ? 'bg-gold text-primary font-bold shadow-lg' : 'hover:bg-gray-800'}`}>
+                <Icon name="bar-chart-2" className="mr-3"/> Dashboard CRM
+              </button>
+
+              <button onClick={() => { setActiveView('map'); setActiveNiche(null); }} className={`w-full flex items-center px-3 py-2.5 rounded-lg transition-all ${activeView === 'map' ? 'bg-gold text-primary font-bold shadow-lg' : 'hover:bg-gray-800'}`}>
+                <Icon name="map" className="mr-3"/> Mapa de Expansão
+              </button>
+
+              <button onClick={() => { setActiveView('history'); setActiveNiche(null); }} className={`w-full flex items-center px-3 py-2.5 rounded-lg transition-all ${activeView === 'history' ? 'bg-gold text-primary font-bold shadow-lg' : 'hover:bg-gray-800'}`}>
+                <Icon name="history" className="mr-3"/> Histórico Completo
+              </button>
+
+              <div className="mt-8 mb-2 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Atalhos por Nicho</div>
+              {NICHES.map(niche => (
+                <button key={niche.id} onClick={() => { setActiveNiche(niche); setActiveView('niche'); }} className={`w-full flex items-center px-3 py-2 rounded-lg text-sm transition-all ${activeNiche?.id === niche.id ? 'bg-gray-800 text-gold font-bold' : 'hover:bg-gray-800'}`}>
+                  <Icon name={niche.icon} className="mr-3 opacity-70" size={16}/> {niche.label}
+                </button>
+              ))}
+            </nav>
+          </aside>
         );
 
         return (
           <div className="flex h-screen overflow-hidden">
              <RenderSidebar />
              <main className="flex-1 overflow-y-auto bg-gray-50">
-                {activeView === 'home' && !mapStep && <RenderHome />}
-                {mapStep && <RenderMapping />}
+                {activeView === 'home' && !mapStep && (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 h-full">
+                    <div className="max-w-xl w-full text-center">
+                       <div className="inline-block p-4 bg-primary rounded-2xl shadow-2xl mb-6"><Icon name="zap" className="text-gold w-12 h-12" /></div>
+                       <h1 className="text-4xl font-serif font-bold text-primary mb-2">ZapHub Pro</h1>
+                       <p className="text-gray-600 mb-8 text-lg">Central de produtividade e CRM para prospecção.</p>
+                       <div className="bg-white p-10 rounded-2xl shadow-xl border-2 border-dashed border-gray-300 hover:border-gold transition-all relative cursor-pointer group">
+                          <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={handleFileUpload} accept=".csv, .xlsx, .xls" />
+                          <Icon name="file-spreadsheet" className="w-16 h-16 text-gray-300 mx-auto mb-4 group-hover:text-gold transition-colors"/>
+                          <h3 className="text-xl font-bold text-gray-700">Importar Leads</h3>
+                          <p className="text-sm text-gray-400 mt-2">Arraste sua planilha aqui</p>
+                       </div>
+                    </div>
+                  </div>
+                )}
+                {mapStep && (
+                   <div className="p-8 flex justify-center items-start pt-20 h-full bg-gray-50">
+                     <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-2xl w-full border-t-8 border-gold">
+                        <h2 className="text-2xl font-bold mb-2 flex items-center text-primary"><Icon name="table" className="mr-2"/> Mapeamento de Colunas</h2>
+                        <div className="grid grid-cols-2 gap-6 my-8">
+                          <div>
+                            <label className="block font-bold text-gray-700 mb-2 text-sm uppercase">Nome do Cliente</label>
+                            <select className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-gold outline-none" value={colName} onChange={e => setColName(Number(e.target.value))}>
+                               <option value="-1">Selecione...</option>
+                               {headers.map(h => <option key={h.idx} value={h.idx}>{h.val}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block font-bold text-gray-700 mb-2 text-sm uppercase">WhatsApp / Telefone</label>
+                            <select className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-gold outline-none" value={colPhone} onChange={e => setColPhone(Number(e.target.value))}>
+                               <option value="-1">Selecione...</option>
+                               {headers.map(h => <option key={h.idx} value={h.idx}>{h.val}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                        <button onClick={processLeads} className="w-full bg-primary text-white py-4 rounded-xl font-bold hover:bg-gray-800 shadow-lg flex justify-center items-center gap-2">Iniciar Geração de Links</button>
+                     </div>
+                   </div>
+                )}
                 {activeView === 'list' && <RenderList />}
+                {activeView === 'reports' && <RenderDashboard />}
                 {activeView === 'map' && <RenderProspectingMap />}
-                {activeView === 'history' && <RenderHistory />}
-                {activeView === 'reports' && <div className="p-20 text-center text-gray-400">Módulo Dashboard em desenvolvimento...</div>}
-                {activeView === 'niche' && <div className="p-20 text-center text-gray-400 font-serif text-2xl">Módulo de Nicho: {activeNiche?.label}</div>}
+                {activeView === 'history' && (
+                  <div className="p-8 max-w-6xl mx-auto pb-20">
+                    <h2 className="text-3xl font-serif font-bold text-primary mb-8">Logs de Atividade</h2>
+                    <div className="bg-white rounded-2xl shadow border overflow-hidden">
+                       <table className="w-full text-left">
+                          <thead className="bg-gray-50 border-b"><tr className="text-xs uppercase text-gray-400 font-bold"><th className="p-4">Lead</th><th className="p-4">WhatsApp</th><th className="p-4">Data/Hora</th></tr></thead>
+                          <tbody className="divide-y">{history.map((h, i) => (<tr key={i} className="hover:bg-gray-50"><td className="p-4 font-bold">{h.name}</td><td className="p-4 text-sm font-mono">{h.phone}</td><td className="p-4 text-sm text-gray-400">{h.dateStr}</td></tr>))}</tbody>
+                       </table>
+                    </div>
+                  </div>
+                )}
+                {activeView === 'niche' && <div className="p-20 text-center text-gray-400 font-serif text-2xl">Módulo Especializado: {activeNiche?.label}</div>}
              </main>
           </div>
         );
