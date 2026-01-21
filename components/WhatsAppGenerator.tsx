@@ -9,7 +9,7 @@ export const WhatsAppGenerator: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'upload' | 'text'>('upload');
   const [rawData, setRawData] = useState<any[][]>([]);
   const [leads, setLeads] = useState<ProcessedLead[]>([]);
-  const [message, setMessage] = useState("Olá, tudo bem?");
+  const [message, setMessage] = useState("Olá! Tudo bem?");
   const [isProcessing, setIsProcessing] = useState(false);
   const [columnMapping, setColumnMapping] = useState<{name: number, phone: number} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -173,7 +173,7 @@ export const WhatsAppGenerator: React.FC = () => {
           {activeTab === 'upload' ? (
             <div className="flex flex-col items-center justify-center text-center">
               <FileSpreadsheet className="w-12 h-12 text-gray-400 mb-3" />
-              <p className="text-gray-600 mb-4">Arraste sua planilha aqui ou clique para buscar</p>
+              <p className="text-gray-600 mb-4">Arraste sua planilha aqui or clique para buscar</p>
               <input 
                 type="file" 
                 ref={fileInputRef} 
